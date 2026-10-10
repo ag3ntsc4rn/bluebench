@@ -1,0 +1,21 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "bluebench",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  // Serve bluebench.dev from this Worker. Wrangler creates the DNS record and
+  // certificate on deploy (the zone must already be on this Cloudflare account).
+  "routes": [{ "pattern": "bluebench.dev", "custom_domain": true }],
+  // The built web app. Static files are served without invoking the Worker;
+  // only /api/* runs Worker code (keeps us well under 100k requests/day).
+  "assets": {
+    "directory": "../web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "observability": { "enabled": false },
+  "send_metrics": false
+}
