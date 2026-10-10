@@ -15,10 +15,16 @@ A free, open-source security "Swiss Army knife" for the community. Web app at **
 TypeScript everywhere, pnpm workspaces monorepo.
 
 ```
-apps/web      React + Vite + Tailwind PWA (vite-plugin-pwa), deployed on Cloudflare Pages / Workers static assets
-apps/api      Hono on Cloudflare Workers
+apps/web      React + Vite + Tailwind PWA (vite-plugin-pwa), built to apps/web/dist
+apps/api      Hono on Cloudflare Workers; also serves apps/web/dist as Workers static assets
 packages/shared   types, indicator detection, validation (zod), used by both
 ```
+
+- **One Worker (`bluebench`) serves bluebench.dev.** `apps/api/wrangler.jsonc` attaches the custom domain and the web build as assets with `run_worker_first: ["/api/*"]`. Static requests never invoke the Worker, so they don't count toward the 100k/day limit.
+- **Security headers have one source:** `packages/shared/src/security-headers.ts`. Hono middleware applies them to API responses, and a Vite plugin emits them as `dist/_headers` for static assets. Any new origin (e.g. Turnstile in M3) must be added to the CSP there.
+- **No inline scripts or styles** (CSP has no `'unsafe-inline'`). IBM Plex is self-hosted in `apps/web/public/fonts` (OFL), with no third-party font requests.
+- Shared package imports use explicit `.ts` extensions, because Vite 8 loads its config through Node's native TS support.
+- pnpm 12: only deps listed under `allowBuilds` in `pnpm-workspace.yaml` may run install scripts.
 
 - Database: Cloudflare D1 via Drizzle ORM (users, domains, alert history, daily counters)
 - Cache: Workers KV for lookup verdicts, TTL 6–24 h (Safe Browsing: obey its cache duration exactly)
@@ -27,7 +33,7 @@ packages/shared   types, indicator detection, validation (zod), used by both
 - Auth: Better Auth, magic link only; email via Resend
 - Alerts: Web Push (VAPID) by default, email as fallback
 - Bot protection: Cloudflare Turnstile
-- Tests: Vitest (+ Miniflare / `@cloudflare/vitest-pool-workers` for the API)
+- Tests: Vitest 4 (+ Miniflare via `@cloudflare/vitest-plugin`, the renamed `vitest-pool-workers`, for the API)
 - CI/CD: GitHub Actions → `wrangler deploy` on push to `main`
 
 Stay on Cloudflare's free tier. Free-tier limits that shape the design:
@@ -96,7 +102,7 @@ Out of scope for v1: CVE feed, one-time secrets, incident runbook, phishing quiz
 
 ## Milestones
 
-1. **Scaffold & deploy** — monorepo, web + api skeletons, shared package, Vitest, GitHub Actions deploy, "hello" page live on bluebench.dev
+1. ✅ **Scaffold & deploy** — monorepo, web + api skeletons, shared package, Vitest, GitHub Actions deploy, "hello" page live on bluebench.dev
 2. **Browser-only tools** — paste box with detection, decoders, email header analyzer
 3. **Lookup API** — abuse.ch + Safe Browsing, KV cache, provider Durable Objects, Turnstile, rate limits, SSRF guard
 4. **Domain report card** — DNS checks, headers, crt.sh cert expiry
