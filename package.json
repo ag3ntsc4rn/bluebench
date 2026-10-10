@@ -1,0 +1,20 @@
+{
+  "name": "bluebench",
+  "private": true,
+  "packageManager": "pnpm@12.11.2",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter @bluebench/web dev",
+    "dev:api": "pnpm --filter @bluebench/api dev",
+    "build": "pnpm --filter @bluebench/web build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "deploy": "pnpm build && pnpm --filter @bluebench/api deploy"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}
