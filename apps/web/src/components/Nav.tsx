@@ -2,7 +2,8 @@ import { TABS, type TabId } from "../tabs";
 import { TabIcon } from "./TabIcon";
 
 interface NavProps {
-  active: TabId;
+  /** Null when a non-tab page (e.g. Privacy) is showing. */
+  active: TabId | null;
   onSelect: (id: TabId) => void;
 }
 

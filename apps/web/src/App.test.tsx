@@ -17,4 +17,16 @@ describe("App", () => {
     expect(renderToString(<App initialTab="learn" />)).toContain("Coming soon.");
     expect(renderToString(<App />).match(/Soon<\/span>/g)).toHaveLength(2);
   });
+
+  it("links to the privacy policy from every tab", () => {
+    expect(renderToString(<App />)).toMatch(/<a href="\/privacy"[^>]*>Privacy<\/a>/);
+    expect(renderToString(<App initialTab="domains" />)).toContain('href="/privacy"');
+  });
+
+  it("serves the privacy policy at /privacy, with no tab marked current", () => {
+    const html = renderToString(<App initialPath="/privacy" />);
+    expect(html).toContain('id="privacy-heading"');
+    expect(html).not.toContain('aria-current="page"');
+    expect(html).toContain("Back to Bluebench");
+  });
 });
