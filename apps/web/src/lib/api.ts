@@ -11,14 +11,20 @@ const OFFLINE: ApiError = {
 
 type Ok = { ok: true };
 
-async function postJson<T extends Ok>(path: string, body: unknown, fetchImpl: typeof fetch): Promise<T | ApiError> {
+/** Call a JSON endpoint. Never throws: failures come back as an ApiError with a message safe to show. */
+export async function requestJson<T extends Ok>(
+  method: "GET" | "POST" | "PATCH" | "DELETE",
+  path: string,
+  body?: unknown,
+  fetchImpl: typeof fetch = fetch,
+): Promise<T | ApiError> {
   let res: Response;
   try {
     res = await fetchImpl(path, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
+      method,
+      headers: body === undefined ? {} : { "content-type": "application/json" },
       credentials: "same-origin",
-      body: JSON.stringify(body),
+      body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
     return OFFLINE;
@@ -40,13 +46,13 @@ async function postJson<T extends Ok>(path: string, body: unknown, fetchImpl: ty
  * POST to an endpoint that needs a session. Runs the bot check only when the server asks for it
  * (first use, or after the 24 h session expires), then retries once.
  */
-async function postWithSession<T extends Ok>(
+export async function postWithSession<T extends Ok>(
   path: string,
   body: unknown,
   getToken: GetTurnstileToken,
   fetchImpl: typeof fetch,
 ): Promise<T | ApiError> {
-  const first = await postJson<T>(path, body, fetchImpl);
+  const first = await requestJson<T>("POST", path, body, fetchImpl);
   if (first.ok || first.error !== "challenge" || !first.siteKey) return first;
 
   let turnstileToken: string;
@@ -59,9 +65,9 @@ async function postWithSession<T extends Ok>(
       message: "The bot check couldn't run. If you block challenges.cloudflare.com, lookups won't work, but the browser tools still do.",
     };
   }
-  const session = await postJson<Ok>("/api/session", { turnstileToken }, fetchImpl);
+  const session = await requestJson<Ok>("POST", "/api/session", { turnstileToken }, fetchImpl);
   if (!session.ok) return session;
-  return postJson<T>(path, body, fetchImpl);
+  return requestJson<T>("POST", path, body, fetchImpl);
 }
 
 /** Look up an indicator's reputation. */

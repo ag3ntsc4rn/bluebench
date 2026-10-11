@@ -89,6 +89,8 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
         // API responses must never be served from the service worker cache.
         navigateFallbackDenylist: [/^\/api\//],
+        // Push and notification-click handlers for alerts (public/push-sw.js).
+        importScripts: ["/push-sw.js"],
       },
     }),
   ],
