@@ -47,6 +47,9 @@ Lookups stay switched off (the API says so politely) until these are set:
 6. **workers.dev subdomain:** the account needs one before this Worker will deploy (error 10063), even though `workers_dev` is off and nothing is served there. Open **Workers & Pages** in the dashboard once and it's created automatically.
 7. **Edge rate limit:** in the dashboard, go to Security → WAF → Rate limiting rules and add a rule for `URI Path starts with /api/`: more than 60 requests per minute from one IP → Block for 1 minute. This stops floods before they reach the Worker's request quota.
 
+8. **security@bluebench.dev:** add it in Email Routing like privacy@ (`/.well-known/security.txt` lists it).
+9. **Search engines:** add `bluebench.dev` to [Google Search Console](https://search.google.com/search-console) and [Bing Webmaster Tools](https://www.bing.com/webmasters) using the **DNS TXT** verification method (no script on the site), then submit `https://bluebench.dev/sitemap.xml`.
+
 Each source can be switched on independently; a missing key shows that source as "not switched on".
 
 IBM Plex fonts are © IBM Corp., licensed under the SIL Open Font License (`apps/web/public/fonts/OFL.txt`).

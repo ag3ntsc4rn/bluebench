@@ -38,6 +38,8 @@ packages/shared   types, indicator detection, validation (zod), used by both
   - The merged verdict is `listed` / `not-listed` / `incomplete`, never "clean".
   - A missing secret switches a source (or lookups) off with a plain message; it never crashes.
   - `apps/api/src/safe-fetch.ts` is the SSRF guard for M4's user-supplied hosts.
+- Routes and SEO: every URL is listed in `apps/web/src/routes.ts`: home, `/privacy`, one landing page per tool (`/ioc-lookup`, `/jwt-decoder`, …) and the 404 page. The build pre-renders each route to its own HTML file in `dist`, with its own title, description, canonical URL and Open Graph tags, and writes `sitemap.xml` (`prerender()` in `apps/web/vite.config.ts` plus `src/prerender.tsx`). `main.tsx` hydrates that HTML. Assets use `not_found_handling: "404-page"`, so unknown paths get a real 404. To add a page, add it to `routes.ts`. `public/og.png` (the link-preview image) is rendered from `apps/web/scripts/og-image.html`; that file explains how to regenerate it.
+- `public/robots.txt` and `public/.well-known/security.txt` (contact: security@bluebench.dev; renew its `Expires` date before 2027-10-01).
 - The privacy policy lives at `/privacy` (`apps/web/src/pages/PrivacyPage.tsx`), linked from every page's footer. Update it, and its date, **before** shipping any change to what data leaves the browser, is stored, or which third parties see it. It must keep linking Cloudflare's Turnstile Privacy Addendum: that's a condition of the invisible Turnstile widget. Contact: privacy@bluebench.dev (Cloudflare Email Routing).
 - API tests mock upstreams with `vi.spyOn(globalThis, "fetch")` (see `apps/api/test/upstream.ts`); the vitest plugin has no `fetchMock`.
 

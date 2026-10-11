@@ -1,0 +1,47 @@
+<!doctype html>
+<!--
+  Source for public/og.png, the 1200x630 link-preview image. Not shipped.
+  Regenerate from apps/web:
+    python3 -m http.server 4180 &
+    firefox --headless --no-remote --profile "$(mktemp -d)" --window-size=1200,630 \
+      --screenshot public/og.png http://localhost:4180/scripts/og-image.html
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  @font-face { font-family: Plex; font-weight: 400; src: url("/public/fonts/ibm-plex-sans-latin-400-normal.woff2"); }
+  @font-face { font-family: Plex; font-weight: 600; src: url("/public/fonts/ibm-plex-sans-latin-600-normal.woff2"); }
+  @font-face { font-family: PlexMono; font-weight: 400; src: url("/public/fonts/ibm-plex-mono-latin-400-normal.woff2"); }
+  * { margin: 0; box-sizing: border-box; }
+  html, body { width: 1200px; height: 630px; overflow: hidden; }
+  body { background: #0e1116; color: #e8eaed; font-family: Plex, sans-serif; padding: 72px 80px; position: relative; }
+  .glow { position: absolute; right: -180px; top: -220px; width: 720px; height: 720px; border-radius: 50%;
+          background: radial-gradient(circle, rgba(91,140,255,.22), rgba(91,140,255,0) 65%); }
+  .brand { display: flex; align-items: center; gap: 28px; }
+  .brand svg { width: 112px; height: 112px; }
+  .name { font-size: 92px; font-weight: 600; letter-spacing: -2px; }
+  .name span { color: #5b8cff; }
+  .tag { margin-top: 36px; font-size: 40px; line-height: 1.25; max-width: 900px; }
+  .chips { margin-top: 40px; display: flex; flex-wrap: wrap; gap: 14px; }
+  .chip { font-family: PlexMono, monospace; font-size: 24px; color: #e8eaed; border: 2px solid #262c36; background: #171b22;
+          border-radius: 999px; padding: 10px 22px; }
+  .foot { position: absolute; left: 80px; right: 80px; bottom: 60px; display: flex; justify-content: space-between;
+          font-size: 26px; color: #9aa3ae; }
+  .foot b { color: #5b8cff; font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="glow"></div>
+  <div class="brand">
+    <svg viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#5B8CFF"/><rect x="11.5" y="24.25" width="41" height="10.25" fill="#050B18"/><rect x="16.75" y="34.5" width="6.25" height="15.5" fill="#050B18"/><rect x="41" y="34.5" width="6.25" height="15.5" fill="#050B18"/></svg>
+    <div class="name"><span>Blue</span>bench</div>
+  </div>
+  <p class="tag">Free, open-source security toolkit for defenders.</p>
+  <div class="chips">
+    <span class="chip">IOC lookup</span><span class="chip">JWT decoder</span><span class="chip">Email headers</span>
+    <span class="chip">Base64</span><span class="chip">URL decoder</span>
+  </div>
+  <div class="foot"><span>Nothing you paste is logged. No ads, no tracking.</span><b>bluebench.dev</b></div>
+</body>
+</html>

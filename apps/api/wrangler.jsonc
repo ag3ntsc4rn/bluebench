@@ -13,7 +13,8 @@
   "assets": {
     "directory": "../web/dist",
     "binding": "ASSETS",
-    "not_found_handling": "single-page-application",
+    // Every route is pre-rendered to its own HTML file; anything else gets dist/404.html with a real 404.
+    "not_found_handling": "404-page",
     "run_worker_first": ["/api/*"]
   },
   // Cached lookup verdicts only (free tier: 1,000 writes/day), never counters.
