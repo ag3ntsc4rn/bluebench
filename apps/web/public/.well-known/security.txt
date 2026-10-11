@@ -1,0 +1,5 @@
+# Found a security problem in Bluebench? Thank you. Please email us; we'll reply within a few days.
+Contact: mailto:security@bluebench.dev
+Expires: 2027-10-01T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://bluebench.dev/.well-known/security.txt

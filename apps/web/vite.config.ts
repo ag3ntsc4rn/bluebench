@@ -1,5 +1,5 @@
 /// <reference types="vitest/config" />
-import { defineConfig, type Plugin } from "vite";
+import { createServer, defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
@@ -16,11 +16,54 @@ function securityHeaders(): Plugin {
   };
 }
 
+/**
+ * Render every route (src/routes.ts) to static HTML with its own title, description and
+ * link-preview tags, and emit sitemap.xml. The app hydrates on top; this is for crawlers,
+ * link previews and first paint. Runs after Vite has emitted index.html, which is the template.
+ */
+function prerender(): Plugin {
+  let root = "";
+  return {
+    name: "bluebench:prerender",
+    apply: "build",
+    configResolved(config) {
+      root = config.root;
+    },
+    generateBundle: {
+      order: "post",
+      async handler(_options, bundle) {
+        const index = bundle["index.html"];
+        if (index?.type !== "asset") throw new Error("prerender: index.html not found in bundle");
+        const server = await createServer({
+          root,
+          configFile: false,
+          logLevel: "error",
+          plugins: [react()],
+          server: { middlewareMode: true, hmr: false, ws: false },
+          appType: "custom",
+        });
+        try {
+          const mod = (await server.ssrLoadModule("/src/prerender.tsx")) as typeof import("./src/prerender");
+          const pages = mod.prerenderPages(String(index.source));
+          for (const page of pages) {
+            if (page.file === "index.html") index.source = page.html;
+            else this.emitFile({ type: "asset", fileName: page.file, source: page.html });
+          }
+          this.emitFile({ type: "asset", fileName: "sitemap.xml", source: mod.sitemap(pages) });
+        } finally {
+          await server.close();
+        }
+      },
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
     securityHeaders(),
+    prerender(),
     VitePWA({
       // We register from src/pwa.ts (bundled, so no inline script for the CSP) and decide when to
       // activate a new version ourselves, so an update never wipes a half-finished paste.

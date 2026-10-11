@@ -1,40 +1,61 @@
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import { Nav } from "./components/Nav";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { LookupPage } from "./pages/LookupPage";
+import { NotFoundPage } from "./pages/NotFoundPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
+import { ToolPage } from "./pages/ToolPage";
+import { metaFor, pageForPath, pathOf, TOOLS, type Page } from "./routes";
 import { TABS, type TabId } from "./tabs";
 
-/** Pages with their own URL. Tabs all live at "/". */
-type Page = "app" | "privacy";
-const PATHS: Record<Page, string> = { app: "/", privacy: "/privacy" };
-const pageFromPath = (path: string): Page => (path.replace(/\/$/, "") === PATHS.privacy ? "privacy" : "app");
+const currentPath = () => (typeof location === "undefined" ? "/" : location.pathname);
 
 export function App({ initialTab = "lookup", initialPath }: { initialTab?: TabId; initialPath?: string }) {
   const [active, setActive] = useState<TabId>(initialTab);
-  const [page, setPage] = useState<Page>(() =>
-    pageFromPath(initialPath ?? (typeof location === "undefined" ? "/" : location.pathname)),
-  );
+  const [page, setPage] = useState<Page>(() => pageForPath(initialPath ?? currentPath()));
   const tab = TABS.find((t) => t.id === active) ?? TABS[0]!;
 
   useEffect(() => {
-    const onPop = () => setPage(pageFromPath(location.pathname));
+    const onPop = () => setPage(pageForPath(location.pathname));
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
+  useEffect(() => {
+    document.title = metaFor(page).title;
+  }, [page]);
+
   const go = (next: Page) => {
-    if (next !== page) history.pushState(null, "", PATHS[next]);
+    const path = pathOf(next);
+    if (path !== location.pathname) history.pushState(null, "", path);
     setPage(next);
     window.scrollTo(0, 0);
   };
-  // Plain links that work without JS too (the Worker serves the app for /privacy); with JS, skip the reload.
-  const link = (next: Page) => (e: MouseEvent<HTMLAnchorElement>) => {
-    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-    e.preventDefault();
-    go(next);
-  };
+
+  // Real links (crawlable, and they work before the script loads); with JS, skip the reload.
+  const Link = ({ to, children }: { to: Page; children: ReactNode }) => (
+    <a
+      href={pathOf(to)}
+      onClick={(e: MouseEvent<HTMLAnchorElement>) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+        e.preventDefault();
+        go(to);
+      }}
+      className="inline-flex min-h-11 items-center underline hover:text-fg"
+    >
+      {children}
+    </a>
+  );
+
+  let content: ReactNode;
+  if (page.kind === "privacy") content = <PrivacyPage />;
+  else if (page.kind === "tool") content = <ToolPage key={page.tool.slug} tool={page.tool} />;
+  else if (page.kind === "notfound") content = <NotFoundPage />;
+  else content = tab.id === "lookup" ? <LookupPage /> : <PlaceholderPage title={tab.label} comingSoon={tab.comingSoon} />;
+
+  // Tool pages belong to the Lookup tab; Privacy and 404 belong to none.
+  const navActive = page.kind === "home" ? active : page.kind === "tool" ? "lookup" : null;
 
   return (
     <div className="min-h-dvh md:pl-60">
@@ -45,32 +66,31 @@ export function App({ initialTab = "lookup", initialPath }: { initialTab?: TabId
         </p>
       </header>
       <main className="mx-auto max-w-3xl px-4 pt-6 pb-28 md:px-8 md:pt-10 md:pb-10">
-        {page === "privacy" ? (
-          <PrivacyPage />
-        ) : tab.id === "lookup" ? (
-          <LookupPage />
-        ) : (
-          <PlaceholderPage title={tab.label} comingSoon={tab.comingSoon} />
-        )}
-        <footer className="mt-10 border-t border-border pt-4 text-sm text-muted">
-          {page === "privacy" ? (
-            <a href={PATHS.app} onClick={link("app")} className="inline-flex min-h-11 items-center underline hover:text-fg">
-              Back to Bluebench
-            </a>
-          ) : (
-            <a href={PATHS.privacy} onClick={link("privacy")} className="inline-flex min-h-11 items-center underline hover:text-fg">
-              Privacy
-            </a>
-          )}
+        {content}
+        <footer className="mt-10 space-y-2 border-t border-border pt-4 text-sm text-muted">
+          <nav aria-label="Tools">
+            <ul className="flex flex-wrap gap-x-4">
+              {TOOLS.map((t) => (
+                <li key={t.slug}>
+                  <Link to={{ kind: "tool", tool: t }}>{t.name}</Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <p className="flex flex-wrap items-center gap-x-4">
+            <Link to={{ kind: "privacy" }}>Privacy</Link>
+            <span>Free and open source. Nothing you paste is logged.</span>
+          </p>
         </footer>
       </main>
       <Nav
-        active={page === "app" ? active : null}
+        active={navActive}
         onSelect={(id) => {
           setActive(id);
-          go("app");
+          go({ kind: "home" });
         }}
       />
     </div>
   );
 }
+

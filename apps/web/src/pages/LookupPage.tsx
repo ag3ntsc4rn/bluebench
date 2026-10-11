@@ -34,7 +34,20 @@ function Tool({ detection, onUseAsInput }: { detection: Detection; onUseAsInput:
   }
 }
 
-export function LookupPage({ initialValue = "" }: { initialValue?: string }) {
+interface LookupPageProps {
+  initialValue?: string;
+  heading?: string;
+  lead?: string;
+  /** Offered via "Try an example" while the box is empty. */
+  example?: string;
+}
+
+export function LookupPage({
+  initialValue = "",
+  heading = "Lookup",
+  lead = "Paste an IP, domain, URL, hash, email address, JWT, base64 or raw email headers.",
+  example,
+}: LookupPageProps) {
   const [input, setInput] = useState(initialValue);
   const [chosen, setChosen] = useState<IndicatorKind | null>(null);
   // Keep typing responsive on big pastes; analysis catches up a frame later.
@@ -64,11 +77,9 @@ export function LookupPage({ initialValue = "" }: { initialValue?: string }) {
     <section aria-labelledby="lookup-heading" className="space-y-4">
       <div>
         <h1 id="lookup-heading" className="text-2xl font-semibold tracking-tight">
-          Lookup
+          {heading}
         </h1>
-        <p className="mt-1 text-muted">
-          Paste an IP, domain, URL, hash, email address, JWT, base64 or raw email headers.
-        </p>
+        <p className="mt-1 text-muted">{lead}</p>
       </div>
       <div className="rounded-lg border border-border bg-surface p-4">
         <label htmlFor="paste" className="block text-sm font-medium">
@@ -108,6 +119,15 @@ export function LookupPage({ initialValue = "" }: { initialValue?: string }) {
           >
             Analyse
           </button>
+          {!input && example && (
+            <button
+              type="button"
+              onClick={() => replaceInput(example)}
+              className="min-h-11 rounded-md border border-border px-4 text-sm text-muted hover:text-fg"
+            >
+              Try an example
+            </button>
+          )}
           {input && (
             <button
               type="button"

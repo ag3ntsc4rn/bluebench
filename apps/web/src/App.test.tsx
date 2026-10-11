@@ -27,6 +27,19 @@ describe("App", () => {
     const html = renderToString(<App initialPath="/privacy" />);
     expect(html).toContain('id="privacy-heading"');
     expect(html).not.toContain('aria-current="page"');
-    expect(html).toContain("Back to Bluebench");
+    expect(html).toContain('href="/jwt-decoder"'); // tool links in the footer everywhere
+  });
+
+  it("serves each tool page under the Lookup tab, with its own heading and an example", () => {
+    const html = renderToString(<App initialPath="/email-header-analyzer" />);
+    expect(html).toContain(">Email header analyzer</h1>");
+    expect(html).toContain("Try an example");
+    expect(html).toMatch(/aria-current="page"[^>]*>.*?<span>Lookup<\/span>/);
+  });
+
+  it("shows a not-found page for unknown paths", () => {
+    const html = renderToString(<App initialPath="/nope" />);
+    expect(html).toContain("Page not found");
+    expect(html).not.toContain('aria-current="page"');
   });
 });
