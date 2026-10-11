@@ -35,8 +35,10 @@ function assertPublicAddress(address: string): void {
   if (!global) throw new BlockedUrlError(`Refusing to connect to a non-public address (${range})`);
 }
 
+export type HostResolver = (host: string, signal?: AbortSignal) => Promise<string[]>;
+
 /** Throws BlockedUrlError unless the URL is http(s), on port 80/443, and every address it resolves to is public. */
-export async function assertSafeUrl(url: URL, signal?: AbortSignal): Promise<void> {
+export async function assertSafeUrl(url: URL, signal?: AbortSignal, resolve: HostResolver = resolveHost): Promise<void> {
   if (url.protocol !== "http:" && url.protocol !== "https:") throw new BlockedUrlError("Only http and https are allowed");
   if (url.username || url.password) throw new BlockedUrlError("URLs with credentials are not allowed");
   if (!ALLOWED_PORTS.has(url.port)) throw new BlockedUrlError("Only ports 80 and 443 are allowed");
@@ -44,7 +46,7 @@ export async function assertSafeUrl(url: URL, signal?: AbortSignal): Promise<voi
   const host = url.hostname.replace(/^\[(.*)\]$/, "$1");
   if (parseIp(host)) return assertPublicAddress(host);
   if (!normalizeDomain(host)) throw new BlockedUrlError("Not a public hostname");
-  const addresses = await resolveHost(host, signal);
+  const addresses = await resolve(host, signal);
   if (addresses.length === 0) throw new BlockedUrlError("Hostname does not resolve");
   addresses.forEach(assertPublicAddress); // every address, so a mixed answer can't sneak a private one in
 }
@@ -54,10 +56,36 @@ export interface SafeFetchOptions {
   headers?: HeadersInit;
   timeoutMs?: number;
   maxRedirects?: number;
+  /** DNS resolver (default: DoH). Lets a caller share a memoised, budgeted resolver. */
+  resolve?: HostResolver;
+  /** Called before each outbound fetch (not DNS); throw to stop, e.g. when a request budget is spent. */
+  beforeFetch?: () => void;
+  /** Return the first response even if it's a redirect, instead of following it. */
+  noFollow?: boolean;
+  /**
+   * At the redirect cap, return what we have (flagged redirectLimitHit) instead of throwing.
+   * The next hop is still never fetched.
+   */
+  returnAtRedirectLimit?: boolean;
 }
 
-/** Fetch with SSRF protection. Returns the final response and the URL it came from. */
-export async function safeFetch(input: string, opts: SafeFetchOptions = {}): Promise<{ response: Response; url: string }> {
+export interface SafeFetchHop {
+  url: string;
+  status: number;
+  headers: Headers;
+}
+
+export interface SafeFetchResult {
+  response: Response;
+  url: string;
+  /** Every response in the chain, first to last (the last is `response`). */
+  hops: SafeFetchHop[];
+  /** True when we stopped at the redirect cap (only with returnAtRedirectLimit). */
+  redirectLimitHit?: boolean;
+}
+
+/** Fetch with SSRF protection. Returns the final response, the URL it came from and each hop. */
+export async function safeFetch(input: string, opts: SafeFetchOptions = {}): Promise<SafeFetchResult> {
   const signal = AbortSignal.timeout(opts.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   const maxRedirects = opts.maxRedirects ?? DEFAULT_MAX_REDIRECTS;
   let url: URL;
@@ -67,12 +95,19 @@ export async function safeFetch(input: string, opts: SafeFetchOptions = {}): Pro
     throw new BlockedUrlError("Invalid URL");
   }
 
+  const hops: SafeFetchHop[] = [];
   for (let hop = 0; ; hop++) {
-    await assertSafeUrl(url, signal);
+    await assertSafeUrl(url, signal, opts.resolve);
+    opts.beforeFetch?.();
     const response = await fetch(url, { method: opts.method ?? "GET", headers: opts.headers, redirect: "manual", signal });
+    hops.push({ url: url.href, status: response.status, headers: response.headers });
     const location = response.headers.get("location");
-    if (response.status < 300 || response.status > 399 || !location) return { response, url: url.href };
-    if (hop >= maxRedirects) throw new BlockedUrlError(`More than ${maxRedirects} redirects`);
+    if (response.status < 300 || response.status > 399 || !location || opts.noFollow) return { response, url: url.href, hops };
+    if (hop >= maxRedirects) {
+      if (opts.returnAtRedirectLimit) return { response, url: url.href, hops, redirectLimitHit: true };
+      await response.body?.cancel();
+      throw new BlockedUrlError(`More than ${maxRedirects} redirects`);
+    }
     await response.body?.cancel();
     try {
       url = new URL(location, url);

@@ -11,12 +11,19 @@ export interface ProviderLimits {
   perDay: number;
 }
 
-/** Kept well inside each provider's terms: abuse.ch asks for modest volume; Safe Browsing's default quota is 10k/day. */
-export const PROVIDER_LIMITS: Readonly<Record<SourceId, ProviderLimits>> = {
+/** Everything with a ProviderQuota instance: the lookup sources, plus crt.sh for domain reports. */
+export type QuotaKey = SourceId | "crtsh";
+
+/**
+ * Kept well inside each provider's terms: abuse.ch asks for modest volume; Safe Browsing's default
+ * quota is 10k/day; crt.sh publishes no limit but asks for restraint (~5/min), and results are cached 24 h.
+ */
+export const PROVIDER_LIMITS: Readonly<Record<QuotaKey, ProviderLimits>> = {
   urlhaus: { perMinute: 30, perDay: 3000 },
   threatfox: { perMinute: 30, perDay: 3000 },
   malwarebazaar: { perMinute: 30, perDay: 3000 },
   safebrowsing: { perMinute: 60, perDay: 8000 },
+  crtsh: { perMinute: 5, perDay: 1000 },
 };
 
 /** Anonymous traffic may spend at most this share of a provider's daily budget. */
@@ -45,7 +52,7 @@ export class ProviderQuota extends DurableObject<Env> {
     );
   }
 
-  acquire(source: SourceId, tier: Tier, now = Date.now()): { ok: true } | { ok: false; reason: QuotaDenial } {
+  acquire(source: QuotaKey, tier: Tier, now = Date.now()): { ok: true } | { ok: false; reason: QuotaDenial } {
     const limits = PROVIDER_LIMITS[source];
     const day = utcDay(now);
     const sql = this.ctx.storage.sql;
