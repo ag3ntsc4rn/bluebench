@@ -38,6 +38,7 @@ packages/shared   types, indicator detection, validation (zod), used by both
   - The merged verdict is `listed` / `not-listed` / `incomplete`, never "clean".
   - A missing secret switches a source (or lookups) off with a plain message; it never crashes.
   - `apps/api/src/safe-fetch.ts` is the SSRF guard for M4's user-supplied hosts.
+- The privacy policy lives at `/privacy` (`apps/web/src/pages/PrivacyPage.tsx`), linked from every page's footer. Update it, and its date, **before** shipping any change to what data leaves the browser, is stored, or which third parties see it. It must keep linking Cloudflare's Turnstile Privacy Addendum: that's a condition of the invisible Turnstile widget. Contact: privacy@bluebench.dev (Cloudflare Email Routing).
 - API tests mock upstreams with `vi.spyOn(globalThis, "fetch")` (see `apps/api/test/upstream.ts`); the vitest plugin has no `fetchMock`.
 
 - Database: Cloudflare D1 via Drizzle ORM (users, domains, alert history, daily counters)
