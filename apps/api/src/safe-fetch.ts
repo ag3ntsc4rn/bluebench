@@ -62,6 +62,11 @@ export interface SafeFetchOptions {
   beforeFetch?: () => void;
   /** Return the first response even if it's a redirect, instead of following it. */
   noFollow?: boolean;
+  /**
+   * At the redirect cap, return what we have (flagged redirectLimitHit) instead of throwing.
+   * The next hop is still never fetched.
+   */
+  returnAtRedirectLimit?: boolean;
 }
 
 export interface SafeFetchHop {
@@ -75,6 +80,8 @@ export interface SafeFetchResult {
   url: string;
   /** Every response in the chain, first to last (the last is `response`). */
   hops: SafeFetchHop[];
+  /** True when we stopped at the redirect cap (only with returnAtRedirectLimit). */
+  redirectLimitHit?: boolean;
 }
 
 /** Fetch with SSRF protection. Returns the final response, the URL it came from and each hop. */
@@ -97,6 +104,7 @@ export async function safeFetch(input: string, opts: SafeFetchOptions = {}): Pro
     const location = response.headers.get("location");
     if (response.status < 300 || response.status > 399 || !location || opts.noFollow) return { response, url: url.href, hops };
     if (hop >= maxRedirects) {
+      if (opts.returnAtRedirectLimit) return { response, url: url.href, hops, redirectLimitHit: true };
       await response.body?.cancel();
       throw new BlockedUrlError(`More than ${maxRedirects} redirects`);
     }

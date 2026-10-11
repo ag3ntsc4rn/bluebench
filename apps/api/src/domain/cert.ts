@@ -79,12 +79,8 @@ export function toCertEntries(rows: CtEntry[], domain: string): CertEntry[] {
 export function judgeCerts(entries: CertEntry[], now: number): Check {
   const current = entries.filter((e) => utc(e.notAfter) > now).sort((a, b) => utc(b.notBefore) - utc(a.notBefore));
   if (current.length === 0) {
-    return {
-      status: "warn",
-      summary: "No current certificate for this name in public Certificate Transparency logs.",
-      fix: "If the site uses HTTPS, check its certificate covers this exact name.",
-      facts: [],
-    };
+    // crt.sh often lags or returns partial results, so absence isn't graded; the HTTPS check covers a missing certificate.
+    return { status: "skipped", summary: "crt.sh has no current certificate on record for this name (its data can lag).", facts: [] };
   }
   const newest = current[0]!;
   const days = Math.floor((utc(newest.notAfter) - now) / DAY_MS);
@@ -118,21 +114,30 @@ export async function certCheck(domain: string, deps: CertDeps): Promise<Check> 
   const permit = await quota.acquire("crtsh", deps.tier).catch(() => ({ ok: false as const, reason: "rate" as const }));
   if (!permit.ok) return skipped(permit.reason === "daily" ? "today's crt.sh budget is used up" : "crt.sh is busy, try again in a minute");
 
-  if (!budget.take()) return skipped("request budget used up");
-  let entries: CertEntry[];
-  try {
-    const res = await fetch(`https://crt.sh/?q=${encodeURIComponent(domain)}&output=json&exclude=expired&deduplicate=Y`, {
-      headers: { accept: "application/json", "user-agent": "Bluebench/1.0 (+https://bluebench.dev)" },
-      signal: AbortSignal.timeout(CRTSH_TIMEOUT_MS),
-    });
-    if (!res.ok) return skipped("crt.sh didn't answer");
-    const parsed: unknown = JSON.parse((await readCapped(res, MAX_BODY_BYTES)) || "[]");
-    if (!Array.isArray(parsed)) return skipped("crt.sh sent an unexpected answer");
-    entries = toCertEntries(parsed as CtEntry[], domain);
-  } catch (e) {
-    if (e instanceof TooLarge) return skipped("this domain has too many certificates to check quickly");
-    return skipped("crt.sh didn't answer in time");
+  // crt.sh is often overloaded (502s). If the broad query fails, try once more with the lighter exact-match query.
+  const base = `https://crt.sh/?q=${encodeURIComponent(domain)}&output=json&exclude=expired&deduplicate=Y`;
+  let entries: CertEntry[] | null = null;
+  for (const url of [base, `${base}&match=%3D`]) {
+    if (!budget.take()) return skipped("request budget used up");
+    try {
+      const res = await fetch(url, {
+        headers: { accept: "application/json", "user-agent": "Bluebench/1.0 (+https://bluebench.dev)" },
+        signal: AbortSignal.timeout(CRTSH_TIMEOUT_MS),
+      });
+      if (res.status >= 502 && res.status <= 504) continue;
+      if (!res.ok) return skipped("crt.sh didn't answer");
+      const parsed: unknown = JSON.parse((await readCapped(res, MAX_BODY_BYTES)) || "[]");
+      if (!Array.isArray(parsed)) return skipped("crt.sh sent an unexpected answer");
+      entries = toCertEntries(parsed as CtEntry[], domain);
+      break;
+    } catch (e) {
+      if (e instanceof TooLarge) return skipped("this domain has too many certificates to check quickly");
+      return skipped("crt.sh didn't answer in time");
+    }
   }
+  if (!entries) return skipped("crt.sh is overloaded right now");
+  // Empty answers aren't cached: they're as likely a crt.sh hiccup as the truth.
+  if (entries.length === 0) return judgeCerts(entries, now);
   deps.waitUntil(env.VERDICTS.put(key, JSON.stringify({ entries }), { expirationTtl: CACHE_TTL_S }).catch(() => {}));
   return judgeCerts(entries, now);
 }

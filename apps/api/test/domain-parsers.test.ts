@@ -78,6 +78,6 @@ describe("certificates", () => {
     expect(judgeCerts([e(-80, 10), e(-5, 40)], NOW)).toMatchObject({ status: "pass", summary: expect.stringContaining("in 40 days") });
     expect(judgeCerts([e(-30, 10)], NOW).status).toBe("warn"); // 10 days: renewal should have happened
     expect(judgeCerts([e(-30, 3)], NOW).status).toBe("fail");
-    expect(judgeCerts([e(-90, -1)], NOW).status).toBe("warn"); // only expired ones: none current
+    expect(judgeCerts([e(-90, -1)], NOW).status).toBe("skipped"); // none current: crt.sh may lag, so not graded
   });
 });

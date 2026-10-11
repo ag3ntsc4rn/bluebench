@@ -6,7 +6,15 @@ import { goodDomain, mockNet, type FakeNet } from "./net.ts";
 
 let n = 0;
 const uniq = (base = "example") => `${base}${n++}-${Date.now()}.test`;
-const deps = { env, tier: "anon" as const, waitUntil: () => {} };
+/**
+ * Report tests use a quota stub that always grants: the real crt.sh quota (5/min) would otherwise make
+ * these tests depend on their order. Quota behaviour itself is covered in quota.test.ts.
+ */
+const openQuota = {
+  idFromName: () => ({}),
+  get: () => ({ acquire: async () => ({ ok: true }) }),
+} as unknown as typeof env.PROVIDER_QUOTA;
+const deps = { env: { ...env, PROVIDER_QUOTA: openQuota }, tier: "anon" as const, waitUntil: () => {} };
 const byId = (r: DomainReport) => Object.fromEntries(r.checks.map((c) => [c.id, c])) as Record<CheckId, DomainReport["checks"][number]>;
 const outbound = (calls: string[]) => calls.filter((u) => !u.includes("challenges.cloudflare.com")).length;
 
@@ -91,6 +99,37 @@ describe("runReport", () => {
     expect(c.dmarc.facts).toContainEqual({ label: "Inherited from", value: "parent.test" });
   });
 
+  it("retries crt.sh once with an exact-match query when it's overloaded", async () => {
+    const d = uniq();
+    const net = goodDomain(d);
+    const rows = net.crtsh as object[];
+    let first = true;
+    const calls = mockNet(net);
+    const real = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const u = new Request(input, init).url;
+      if (u.startsWith("https://crt.sh/") && first) {
+        first = false;
+        calls.push(u);
+        return new Response("Bad Gateway", { status: 502 });
+      }
+      return real(input, init);
+    });
+    const c = byId(await runReport(d, deps));
+    expect(c.cert.status).toBe("pass");
+    const crt = calls.filter((u) => u.startsWith("https://crt.sh/"));
+    expect(crt).toHaveLength(2);
+    expect(crt[1]).toContain("match=%3D");
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
+  it("doesn't grade or cache an empty crt.sh answer", async () => {
+    const d = uniq();
+    mockNet({ ...goodDomain(d), crtsh: [] });
+    expect(byId(await runReport(d, deps)).cert.status).toBe("skipped");
+    expect(await env.VERDICTS.get(`cert:v1:${await sha256Hex(d)}`)).toBeNull();
+  });
+
   it("flags broken DNSSEC", async () => {
     const d = uniq();
     mockNet({ dns: { [d]: { servfail: true } }, crtsh: [] });
@@ -103,6 +142,45 @@ describe("runReport", () => {
     const c = byId(await runReport(d, deps));
     expect(c.https).toMatchObject({ status: "fail", summary: expect.stringContaining("non-public") });
     expect(calls.some((u) => u.startsWith(`https://${d}`) || u.startsWith(`http://${d}`))).toBe(false);
+  });
+
+  it("counts a site with a long redirect chain as working, without following past 3 redirects", async () => {
+    const d = uniq();
+    const net = goodDomain(d);
+    const hsts = { "strict-transport-security": "max-age=31536000" };
+    net.sites = {
+      [`https://${d}/`]: { status: 302, headers: { location: `https://${d}/a`, ...hsts } },
+      [`https://${d}/a`]: { status: 302, headers: { location: `https://${d}/b` } },
+      [`https://${d}/b`]: { status: 302, headers: { location: `https://${d}/c` } },
+      [`https://${d}/c`]: { status: 302, headers: { location: `https://${d}/d` } },
+      [`https://${d}/d`]: { status: 200 },
+      [`http://${d}/`]: { status: 301, headers: { location: `https://${d}/` } },
+    };
+    const calls = mockNet(net);
+    const c = byId(await runReport(d, deps));
+    expect(c.https.status).toBe("pass");
+    expect(c.https.facts).toContainEqual({ label: "HTTPS response", value: "stopped after 4 redirects" });
+    expect(c.hsts.status).toBe("pass"); // from the first response
+    expect(c.headers.status).toBe("skipped");
+    expect(calls).not.toContain(`https://${d}/d`); // the 4th redirect is never followed
+  });
+
+  it("follows plain-HTTP redirects to see if they end up on HTTPS, without fetching the HTTPS URL", async () => {
+    const d = uniq();
+    const net = goodDomain(d);
+    net.sites![`http://${d}/`] = { status: 301, headers: { location: "/mail/" } };
+    net.sites![`http://${d}/mail/`] = { status: 302, headers: { location: `https://${d}/mail/` } };
+    const calls = mockNet(net);
+    const c = byId(await runReport(d, deps));
+    expect(c.https).toMatchObject({ status: "pass" });
+    expect(c.https.facts).toContainEqual({ label: "Plain HTTP", value: `301 → /mail/, 302 → https://${d}/mail/` });
+    expect(calls).not.toContain(`https://${d}/mail/`);
+  });
+
+  it("warns rather than fails on missing SPF for a domain without mail servers", async () => {
+    const d = uniq();
+    mockNet({ dns: { [d]: { A: ["93.184.215.14"] } }, crtsh: [] });
+    expect(byId(await runReport(d, deps)).spf).toMatchObject({ status: "warn", fix: expect.stringContaining("v=spf1 -all") });
   });
 
   it("treats a domain with no address as having no website (not a failure)", async () => {

@@ -99,7 +99,8 @@ export async function spfCheck(r: Resolver, domain: string, receivesMail: boolea
   const fixNoMail = `Add a TXT record at ${domain}: v=spf1 -all (this domain sends no email).`;
   if (records.length === 0) {
     return {
-      status: "fail",
+      // A domain without mail servers is lower risk (DMARC may still protect it), but should say it sends nothing.
+      status: receivesMail ? "fail" : "warn",
       summary: "No SPF record, so anyone can send email claiming to be from this domain.",
       fix: receivesMail
         ? `Add a TXT record at ${domain} listing your mail senders, e.g. v=spf1 include:<your provider> -all.`

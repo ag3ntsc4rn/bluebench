@@ -108,6 +108,17 @@ describe("safeFetch", () => {
     await expect(safeFetch("https://a.test/0")).rejects.toThrow("More than 3 redirects");
   });
 
+  it("can return at the redirect cap instead of throwing, still without fetching the next hop", async () => {
+    const spy = mockNet(
+      { "a.test": ["93.184.215.14"] },
+      { "https://a.test/0": redirect("/1"), "https://a.test/1": redirect("/2"), "https://a.test/2": redirect("/3"), "https://a.test/3": redirect("/4") },
+    );
+    const res = await safeFetch("https://a.test/0", { returnAtRedirectLimit: true });
+    expect(res.redirectLimitHit).toBe(true);
+    expect(res.hops.map((h) => h.url)).toEqual(["https://a.test/0", "https://a.test/1", "https://a.test/2", "https://a.test/3"]);
+    expect(spy.mock.calls.some(([u]) => String(u).endsWith("/4"))).toBe(false);
+  });
+
   it("refuses a redirect to a private address without fetching it", async () => {
     const spy = mockNet({ "a.test": ["93.184.215.14"] }, { "https://a.test/": redirect("http://169.254.169.254/") });
     await expect(safeFetch("https://a.test/")).rejects.toThrow("Cloud metadata");

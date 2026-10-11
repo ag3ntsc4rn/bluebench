@@ -12,10 +12,48 @@ const ONE_YEAR = 31_536_000;
 export interface WebProbe {
   /** False when the name has no A/AAAA records: there's no website to grade. */
   hasAddress: boolean;
-  /** https://domain/ chain, or why it failed. */
-  https: { hops: SafeFetchHop[] } | { error: string };
-  /** First response from http://domain/, or why it failed. */
-  http: SafeFetchHop | { error: string };
+  /** https://domain/ chain (possibly cut off at the redirect cap), or why it failed. */
+  https: { hops: SafeFetchHop[]; redirectLimitHit: boolean } | { error: string };
+  /** Where plain http://domain/ leads, or why it failed. */
+  http: PlainHttp | { error: string };
+}
+
+export interface PlainHttp {
+  /** The plain-HTTP chain ends in a redirect to an https:// URL. */
+  reachesHttps: boolean;
+  /** e.g. "301 → /mail/, 301 → https://example.com/mail/" or "200". */
+  trail: string;
+}
+
+const isRedirect = (status: number) => status >= 300 && status < 400;
+
+/**
+ * Follow plain-HTTP redirects (up to 3, each SSRF-checked) until one points at https://. We stop there,
+ * without fetching the https:// URL: the HTTPS probe covers that.
+ */
+async function followPlainHttp(start: string, opts: Parameters<typeof safeFetch>[1]): Promise<PlainHttp> {
+  let url = start;
+  const trail: string[] = [];
+  for (let hop = 0; hop < 3; hop++) {
+    const res = await safeFetch(url, { ...opts, noFollow: true });
+    await res.response.body?.cancel();
+    const { status, headers } = res.hops[0]!;
+    const location = headers.get("location");
+    if (!isRedirect(status) || !location) {
+      trail.push(String(status));
+      return { reachesHttps: false, trail: trail.join(", ") };
+    }
+    trail.push(`${status} → ${location}`);
+    let next: URL;
+    try {
+      next = new URL(location, url);
+    } catch {
+      return { reachesHttps: false, trail: trail.join(", ") };
+    }
+    if (next.protocol === "https:") return { reachesHttps: true, trail: trail.join(", ") };
+    url = next.href;
+  }
+  return { reachesHttps: false, trail: `${trail.join(", ")}, …` };
 }
 
 function describe(e: unknown): string {
@@ -25,7 +63,7 @@ function describe(e: unknown): string {
   return "Couldn't connect";
 }
 
-/** Fetch the site's home page over https (following up to 3 redirects) and http (first response only). */
+/** Fetch the site's home page over https (up to 3 redirects) and see where plain http leads (up to 3 redirects). */
 export async function probeWeb(r: Resolver, budget: Budget, domain: string): Promise<WebProbe> {
   const hasAddress = (await r.addresses(domain)).length > 0;
   if (!hasAddress) return { hasAddress, https: { error: "No address" }, http: { error: "No address" } };
@@ -37,20 +75,14 @@ export async function probeWeb(r: Resolver, budget: Budget, domain: string): Pro
     headers: { "user-agent": USER_AGENT, accept: "text/html" },
   };
   const [https, http] = await Promise.all([
-    safeFetch(`https://${domain}/`, opts).then(
+    safeFetch(`https://${domain}/`, { ...opts, returnAtRedirectLimit: true }).then(
       async (res) => {
         await res.response.body?.cancel(); // headers are all we need
-        return { hops: res.hops };
+        return { hops: res.hops, redirectLimitHit: res.redirectLimitHit === true };
       },
       (e: unknown) => ({ error: describe(e) }),
     ),
-    safeFetch(`http://${domain}/`, { ...opts, noFollow: true }).then(
-      async (res) => {
-        await res.response.body?.cancel();
-        return res.hops[0]!;
-      },
-      (e: unknown) => ({ error: describe(e) }),
-    ),
+    followPlainHttp(`http://${domain}/`, opts).catch((e: unknown) => ({ error: describe(e) })),
   ]);
   return { hasAddress, https, http };
 }
@@ -70,22 +102,15 @@ export function httpsCheck(probe: WebProbe, domain: string): Check {
     };
   }
   const final = probe.https.hops.at(-1)!;
-  const facts = [fact("HTTPS response", `${final.status} from ${final.url}`)];
+  const facts = [
+    fact("HTTPS response", probe.https.redirectLimitHit ? `stopped after ${probe.https.hops.length} redirects` : `${final.status} from ${final.url}`),
+  ];
   if ("error" in probe.http) {
     // Port 80 closed is fine: nothing is served unencrypted.
     return { status: "pass", summary: "Loads over HTTPS, and nothing is served over plain HTTP.", facts };
   }
-  const loc = probe.http.headers.get("location") ?? "";
-  facts.push(fact("Plain HTTP", probe.http.status >= 300 && probe.http.status < 400 ? `${probe.http.status} → ${loc}` : String(probe.http.status)));
-  let target: URL | null = null;
-  try {
-    target = new URL(loc, `http://${domain}/`);
-  } catch {
-    // ignore
-  }
-  if (probe.http.status >= 300 && probe.http.status < 400 && target?.protocol === "https:") {
-    return { status: "pass", summary: "Loads over HTTPS, and plain HTTP redirects to it.", facts };
-  }
+  facts.push(fact("Plain HTTP", probe.http.trail));
+  if (probe.http.reachesHttps) return { status: "pass", summary: "Loads over HTTPS, and plain HTTP redirects to it.", facts };
   return {
     status: "warn",
     summary: "Loads over HTTPS, but plain HTTP doesn't redirect to it, so some visitors stay unencrypted.",
@@ -110,7 +135,12 @@ export function hstsCheck(probe: WebProbe): Check {
   const header = probe.https.hops[0]!.headers.get("strict-transport-security");
   const fix = "Send Strict-Transport-Security: max-age=31536000; includeSubDomains on every HTTPS response.";
   if (!header) {
-    return { status: "fail", summary: "No HSTS header, so a first visit over http:// can be intercepted.", fix, facts: [] };
+    return {
+      status: "fail",
+      summary: "No HSTS header, so a first visit over http:// can be intercepted (unless browsers have the domain preloaded).",
+      fix,
+      facts: [],
+    };
   }
   const h = parseHsts(header);
   const facts = [fact("Header", header)];
@@ -141,6 +171,10 @@ const HEADER_CHECKS: { name: string; present: (h: Headers) => boolean }[] = [
 export function headersCheck(probe: WebProbe): Check {
   if (!probe.hasAddress) return NO_SITE;
   if ("error" in probe.https) return { status: "skipped", summary: "Skipped: the site doesn't load over HTTPS.", facts: [] };
+  if (probe.https.redirectLimitHit) {
+    // Headers on a redirect aren't the page's headers; we don't follow further to find the page.
+    return { status: "skipped", summary: "Skipped: the home page redirects more than 3 times, and we stop there.", facts: [] };
+  }
   const final = probe.https.hops.at(-1)!;
   const missing = HEADER_CHECKS.filter((c) => !c.present(final.headers)).map((c) => c.name);
   const have = HEADER_CHECKS.length - missing.length;
