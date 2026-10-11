@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Nav } from "./components/Nav";
+import { UpdateBanner } from "./components/UpdateBanner";
 import { LookupPage } from "./pages/LookupPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { TABS, type TabId } from "./tabs";
@@ -10,6 +11,7 @@ export function App({ initialTab = "lookup" }: { initialTab?: TabId }) {
 
   return (
     <div className="min-h-dvh md:pl-60">
+      <UpdateBanner />
       <header className="flex items-center border-b border-border px-4 py-3 md:hidden">
         <p className="text-lg font-semibold tracking-tight">
           <span className="text-accent">Blue</span>bench
