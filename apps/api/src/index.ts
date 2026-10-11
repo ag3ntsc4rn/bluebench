@@ -1,32 +1,29 @@
-import { Hono, type Context } from "hono";
-import { getCookie, setCookie } from "hono/cookie";
+import { Hono } from "hono";
+import { setCookie } from "hono/cookie";
 import {
   canonicalDomain,
   orgDomain,
   canonicalIndicator,
   DomainRequestSchema,
   sha256Hex,
-  ipRateKey,
   LookupRequestSchema,
-  MAX_PASTE_LENGTH,
   SECURITY_HEADERS,
   SessionRequestSchema,
-  type ApiError,
   type DomainReport,
   type HealthResponse,
   type LookupResponse,
 } from "@bluebench/shared";
+import { account } from "./account.ts";
 import type { Env } from "./env.ts";
 import { domainReport, hasCachedReport } from "./domain/report.ts";
+import { admit, challenge, chargeDaily, clientIp, fail, notConfigured, readJson } from "./http.ts";
 import { lookup } from "./lookup.ts";
-import { ANON_DAILY_LIMIT } from "./quota.ts";
-import { hmac, SESSION_COOKIE, SESSION_TTL_SECONDS, signSession, verifySession, verifyTurnstile } from "./session.ts";
+import { tick } from "./monitor/run.ts";
+import { SESSION_COOKIE, SESSION_TTL_SECONDS, signSession, verifyTurnstile } from "./session.ts";
 
 export { ProviderQuota, UsageCounter } from "./quota.ts";
 export type { Env };
 // Only handlers and Durable Object classes may be exported from the main module; workerd refuses anything else.
-
-type Ctx = Context<{ Bindings: Env }>;
 
 const app = new Hono<{ Bindings: Env }>().basePath("/api");
 
@@ -39,32 +36,7 @@ app.use("*", async (c, next) => {
   c.res.headers.set("Cache-Control", "no-store");
 });
 
-function fail(c: Ctx, status: 400 | 401 | 403 | 413 | 415 | 429 | 503, body: Omit<ApiError, "ok">) {
-  if (body.retryAfter) c.header("Retry-After", String(body.retryAfter));
-  return c.json<ApiError>({ ok: false, ...body }, status);
-}
-
-const challenge = (c: Ctx, message = "Please complete a quick bot check.") =>
-  fail(c, 401, { error: "challenge", message, siteKey: c.env.TURNSTILE_SITE_KEY });
-
-const notConfigured = (c: Ctx) =>
-  fail(c, 503, { error: "unavailable", message: "Reputation lookups aren't switched on yet. The browser tools still work." });
-
-/** Read a small JSON body: must be declared JSON (forces a CORS preflight cross-site) and under the paste cap. */
-async function readJson(c: Ctx): Promise<{ ok: true; data: unknown } | { ok: false; res: Response }> {
-  if (!c.req.header("content-type")?.toLowerCase().startsWith("application/json")) {
-    return { ok: false, res: fail(c, 415, { error: "invalid", message: "Expected JSON." }) };
-  }
-  const text = await c.req.text();
-  if (text.length > MAX_PASTE_LENGTH) return { ok: false, res: fail(c, 413, { error: "invalid", message: "Request too large." }) };
-  try {
-    return { ok: true, data: JSON.parse(text) };
-  } catch {
-    return { ok: false, res: fail(c, 400, { error: "invalid", message: "Expected JSON." }) };
-  }
-}
-
-/** Reject cross-site requests outright (the session cookie is also SameSite=Strict). */
+/** Reject cross-site requests outright (the session cookies are also SameSite=Strict). */
 app.use("*", async (c, next) => {
   const origin = c.req.header("origin");
   if (c.req.method !== "GET" && origin && origin !== new URL(c.req.url).origin) {
@@ -72,8 +44,6 @@ app.use("*", async (c, next) => {
   }
   await next();
 });
-
-const clientIp = (c: Ctx) => ipRateKey(c.req.header("cf-connecting-ip") ?? "");
 
 app.get("/health", (c) => c.json<HealthResponse>({ ok: true }));
 
@@ -105,43 +75,6 @@ app.post("/session", async (c) => {
   return c.json({ ok: true });
 });
 
-type Admitted = { ok: true; sessionId: string; ipKey: string; secret: string } | { ok: false; res: Response };
-
-/** Gate for anything that costs upstream calls: configured, a valid session, and within per-minute limits. */
-async function admit(c: Ctx): Promise<Admitted> {
-  const { TURNSTILE_SITE_KEY, SESSION_SECRET } = c.env;
-  if (!TURNSTILE_SITE_KEY || !SESSION_SECRET) return { ok: false, res: notConfigured(c) };
-
-  // No token, no lookups.
-  const session = await verifySession(SESSION_SECRET, getCookie(c, SESSION_COOKIE, "host"));
-  if (!session) return { ok: false, res: challenge(c) };
-
-  const ipKey = clientIp(c);
-  const [byToken, byIp] = await Promise.all([
-    c.env.TOKEN_LIMITER.limit({ key: session.id }),
-    c.env.IP_LIMITER.limit({ key: `lookup:${ipKey}` }),
-  ]);
-  if (!byToken.success || !byIp.success) {
-    return {
-      ok: false,
-      res: fail(c, 429, { error: "rate-limited", message: "That's a lot of checks in a minute. Wait a moment and try again.", retryAfter: 60 }),
-    };
-  }
-  return { ok: true, sessionId: session.id, ipKey, secret: SESSION_SECRET };
-}
-
-/** Count one lookup or domain check against today's caps. Counters are keyed by HMACs, so no session ids or IPs are stored. */
-async function chargeDaily(c: Ctx, a: Extract<Admitted, { ok: true }>): Promise<Response | null> {
-  const keys = await Promise.all([hmac(a.secret, `s:${a.sessionId}`), hmac(a.secret, `ip:${a.ipKey}`)]);
-  const usage = c.env.USAGE.get(c.env.USAGE.idFromName("daily"));
-  const quota = await usage.consume(keys, ANON_DAILY_LIMIT);
-  if (quota.ok) return null;
-  return fail(c, 429, {
-    error: "daily-limit",
-    message: `You've used today's ${ANON_DAILY_LIMIT} free lookups and checks. They reset at midnight UTC. Signing in and your own API keys are coming soon.`,
-  });
-}
-
 app.post("/lookup", async (c) => {
   const a = await admit(c);
   if (!a.ok) return a.res;
@@ -159,7 +92,7 @@ app.post("/lookup", async (c) => {
 
   const result = await lookup(parsed.data.kind, value, {
     env: c.env,
-    tier: "anon",
+    tier: a.tier,
     waitUntil: (p) => c.executionCtx.waitUntil(p),
   });
   return c.json<LookupResponse>(result);
@@ -193,16 +126,24 @@ app.post("/domain", async (c) => {
 
   const report = await domainReport(domain, {
     env: c.env,
-    tier: "anon",
+    tier: a.tier,
     waitUntil: (p) => c.executionCtx.waitUntil(p),
     selfZone: orgDomain(new URL(c.req.url).hostname),
   });
   return c.json<DomainReport>(report);
 });
 
+app.route("/", account);
+
 app.notFound((c) => c.json({ ok: false, error: "Not found" }, 404));
 
 // Never echo request details or stack traces; nothing pasted is logged.
 app.onError((_err, c) => c.json({ ok: false, error: "Internal error" }, 500));
 
-export default app;
+export default {
+  fetch: app.fetch,
+  /** Every minute: deliver pending alerts, or re-check the next due domain (see monitor/run.ts). */
+  async scheduled(controller, env, ctx) {
+    await tick(env, { now: controller.scheduledTime, waitUntil: (p) => ctx.waitUntil(p) });
+  },
+} satisfies ExportedHandler<Env>;
