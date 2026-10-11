@@ -36,8 +36,10 @@
     { "name": "IP_LIMITER", "namespace_id": "1002", "simple": { "limit": 30, "period": 60 } }
   ],
   "vars": {
-    // Public Turnstile site key. Empty = lookups switched off (API answers "not switched on yet").
-    "TURNSTILE_SITE_KEY": ""
+    // Public Turnstile site key (invisible widget for bluebench.dev). Empty = lookups switched off.
+    // Invisible mode requires our privacy policy (apps/web/src/pages/PrivacyPage.tsx) to reference
+    // Cloudflare's Turnstile Privacy Addendum.
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAFT1Dg5bCHUCflEe"
   },
   // Secrets (wrangler secret put): TURNSTILE_SECRET_KEY, SESSION_SECRET, ABUSECH_AUTH_KEY, SAFE_BROWSING_API_KEY
   "observability": { "enabled": false },

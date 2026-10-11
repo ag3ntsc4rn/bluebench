@@ -39,7 +39,7 @@ Every push to `main` runs the tests and then `wrangler deploy` via GitHub Action
 
 Lookups stay switched off (the API says so politely) until these are set:
 
-1. **Turnstile:** in the Cloudflare dashboard, add a Turnstile widget for `bluebench.dev` in **Invisible** mode. Put its site key in `apps/api/wrangler.jsonc` → `vars.TURNSTILE_SITE_KEY` (it's public). Set the secret key with `wrangler secret put TURNSTILE_SECRET_KEY`.
+1. **Turnstile:** the invisible widget for `bluebench.dev` exists and its public site key is in `apps/api/wrangler.jsonc`. Set its secret key with `wrangler secret put TURNSTILE_SECRET_KEY` (or in the dashboard as a Secret). Invisible mode requires the privacy policy to link Cloudflare's Turnstile Privacy Addendum; `/privacy` does.
 2. **Session signing:** `openssl rand -base64 32 | wrangler secret put SESSION_SECRET`.
 3. **abuse.ch:** get a free Auth-Key at <https://auth.abuse.ch/> → `wrangler secret put ABUSECH_AUTH_KEY` (used for URLhaus, ThreatFox and MalwareBazaar).
 4. **Google Safe Browsing:** enable the Safe Browsing API in a Google Cloud project and create an API key restricted to it → `wrangler secret put SAFE_BROWSING_API_KEY`.
