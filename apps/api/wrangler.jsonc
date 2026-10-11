@@ -16,6 +16,29 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*"]
   },
+  // Cached lookup verdicts only (free tier: 1,000 writes/day), never counters.
+  // No id: Wrangler provisions the namespace on first deploy and remembers it.
+  "kv_namespaces": [{ "binding": "VERDICTS" }],
+  "durable_objects": {
+    "bindings": [
+      // One instance per upstream provider: token bucket + daily budget.
+      { "name": "PROVIDER_QUOTA", "class_name": "ProviderQuota" },
+      // Daily lookup caps per session and per IP group.
+      { "name": "USAGE", "class_name": "UsageCounter" }
+    ]
+  },
+  // Free plan requires SQLite-backed Durable Objects.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ProviderQuota", "UsageCounter"] }],
+  // Per-minute limits, per session token and per IP (IPv6 grouped by /64).
+  "ratelimits": [
+    { "name": "TOKEN_LIMITER", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } },
+    { "name": "IP_LIMITER", "namespace_id": "1002", "simple": { "limit": 30, "period": 60 } }
+  ],
+  "vars": {
+    // Public Turnstile site key. Empty = lookups switched off (API answers "not switched on yet").
+    "TURNSTILE_SITE_KEY": ""
+  },
+  // Secrets (wrangler secret put): TURNSTILE_SECRET_KEY, SESSION_SECRET, ABUSECH_AUTH_KEY, SAFE_BROWSING_API_KEY
   "observability": { "enabled": false },
   "send_metrics": false
 }

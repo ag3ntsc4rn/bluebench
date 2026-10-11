@@ -1,0 +1,7 @@
+# Copy to .dev.vars for `wrangler dev`. These are Cloudflare's always-pass Turnstile test keys.
+TURNSTILE_SITE_KEY=1x00000000000000000000AA
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
+SESSION_SECRET=dev-only-change-me
+# Optional: real keys to try live lookups locally. Leave unset to see sources "not switched on".
+# ABUSECH_AUTH_KEY=
+# SAFE_BROWSING_API_KEY=
