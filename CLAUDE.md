@@ -24,6 +24,8 @@ packages/shared   types, indicator detection, validation (zod), used by both
 - **Security headers have one source:** `packages/shared/src/security-headers.ts`. Hono middleware applies them to API responses, and a Vite plugin emits them as `dist/_headers` for static assets. Any new origin (e.g. Turnstile in M3) must be added to the CSP there.
 - **No inline scripts or styles** (CSP has no `'unsafe-inline'`). IBM Plex is self-hosted in `apps/web/public/fonts` (OFL), with no third-party font requests.
 - Shared package imports use explicit `.ts` extensions, because Vite 8 loads its config through Node's native TS support.
+- `packages/shared` holds pure, runtime-neutral code (detection, refanging, IP classification, domain helpers, base64/text). Its tsconfig adds the `DOM` lib only for web-standard globals (`URL`, `TextDecoder`, `atob`) that browsers, Workers and Node all provide. Browser-only analysers (JWT, URL, email headers) live in `apps/web/src/lib`.
+- Tool UI must not use React `style` props: CSP `style-src 'self'` blocks inline style attributes.
 - pnpm 12: only deps listed under `allowBuilds` in `pnpm-workspace.yaml` may run install scripts.
 
 - Database: Cloudflare D1 via Drizzle ORM (users, domains, alert history, daily counters)
@@ -103,7 +105,7 @@ Out of scope for v1: CVE feed, one-time secrets, incident runbook, phishing quiz
 ## Milestones
 
 1. ✅ **Scaffold & deploy** — monorepo, web + api skeletons, shared package, Vitest, GitHub Actions deploy, "hello" page live on bluebench.dev
-2. **Browser-only tools** — paste box with detection, decoders, email header analyzer
+2. ✅ **Browser-only tools** — paste box with detection, decoders, email header analyzer
 3. **Lookup API** — abuse.ch + Safe Browsing, KV cache, provider Durable Objects, Turnstile, rate limits, SSRF guard
 4. **Domain report card** — DNS checks, headers, crt.sh cert expiry
 5. **Accounts & monitoring** — Better Auth magic link, saved domains, TXT verification, daily cron, push + email alerts
