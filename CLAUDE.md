@@ -116,4 +116,5 @@ Out of scope for v1: CVE feed, one-time secrets, incident runbook, phishing quiz
 - One milestone per session. Plan briefly, build, test, then summarize what changed and what the owner must do (secrets, dashboard settings).
 - Write tests for detection, parsing, SSRF guard and rate limiting.
 - Small, well-described commits.
+- Never commit to `main` directly (a push to `main` deploys). Work on a branch per milestone or change, push it and open a PR with `gh pr create`; merge only after CI passes and the owner approves.
 - Keep this file current when a decision changes.
