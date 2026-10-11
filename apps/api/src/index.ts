@@ -2,6 +2,7 @@ import { Hono, type Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import {
   canonicalDomain,
+  orgDomain,
   canonicalIndicator,
   DomainRequestSchema,
   sha256Hex,
@@ -190,7 +191,12 @@ app.post("/domain", async (c) => {
   const overDaily = await chargeDaily(c, a);
   if (overDaily) return overDaily;
 
-  const report = await domainReport(domain, { env: c.env, tier: "anon", waitUntil: (p) => c.executionCtx.waitUntil(p) });
+  const report = await domainReport(domain, {
+    env: c.env,
+    tier: "anon",
+    waitUntil: (p) => c.executionCtx.waitUntil(p),
+    selfZone: orgDomain(new URL(c.req.url).hostname),
+  });
   return c.json<DomainReport>(report);
 });
 
@@ -199,26 +205,4 @@ app.notFound((c) => c.json({ ok: false, error: "Not found" }, 404));
 // Never echo request details or stack traces; nothing pasted is logged.
 app.onError((_err, c) => c.json({ ok: false, error: "Internal error" }, 500));
 
-/** Apply our security headers to a response from another layer (e.g. static assets). */
-function withSecurityHeaders(res: Response): Response {
-  const out = new Response(res.body, res);
-  for (const [name, value] of Object.entries(SECURITY_HEADERS)) out.headers.set(name, value);
-  return out;
-}
-
-export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(request.url);
-    if (url.pathname === "/api" || url.pathname.startsWith("/api/")) return app.fetch(request, env, ctx);
-
-    // Visitors' page requests never get here: run_worker_first covers /api/* only, and Cloudflare's edge
-    // redirects http to https and serves the static files. But when this Worker fetches its own domain
-    // (a domain report on bluebench.dev), the request comes straight back here. Behave like the edge so
-    // the report sees the real site.
-    if (url.protocol === "http:") {
-      url.protocol = "https:";
-      return Response.redirect(url.href, 301);
-    }
-    return withSecurityHeaders(await env.ASSETS.fetch(request));
-  },
-} satisfies ExportedHandler<Env>;
+export default app;

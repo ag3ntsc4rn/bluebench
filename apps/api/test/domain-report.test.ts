@@ -183,6 +183,21 @@ describe("runReport", () => {
     expect(byId(await runReport(d, deps)).spf).toMatchObject({ status: "warn", fix: expect.stringContaining("v=spf1 -all") });
   });
 
+  it("doesn't fetch sites in its own Cloudflare zone, and doesn't grade those checks", async () => {
+    const net = goodDomain("bluebench.dev");
+    net.sites = {}; // any fetch of the site would fail the HTTPS check
+    const calls = mockNet(net);
+    const r = await runReport("bluebench.dev", { ...deps, selfZone: "bluebench.dev" });
+    const c = byId(r);
+    for (const id of ["https", "hsts", "headers"] as const) {
+      expect(c[id]).toMatchObject({ status: "skipped", summary: expect.stringContaining("own Cloudflare zone") });
+    }
+    expect(calls.some((u) => /^https?:\/\/bluebench\.dev\//.test(u))).toBe(false);
+    expect(r.grade).toBe("A"); // email, DNS and certificate checks still count
+    // Other domains are unaffected.
+    expect(byId(await runReport(uniq(), { ...deps, selfZone: "bluebench.dev" })).https.status).not.toBe("skipped");
+  });
+
   it("treats a domain with no address as having no website (not a failure)", async () => {
     const d = uniq();
     mockNet({ dns: { [d]: { MX: [`10 mx.${d}.`] } }, crtsh: [] });
@@ -246,7 +261,7 @@ describe("POST /api/domain", () => {
     expect(first).toMatchObject({ ok: true, domain: d, grade: "A" });
     expect(first.cached).toBeUndefined();
 
-    const key = `report:v1:${await sha256Hex(d)}`;
+    const key = `report:v2:${await sha256Hex(d)}`;
     const raw = await vi.waitFor(async () => {
       const v = await env.VERDICTS.get(key);
       if (!v) throw new Error("not cached yet");
@@ -259,10 +274,17 @@ describe("POST /api/domain", () => {
     expect(again.checks.find((c) => c.id === "mx")!.facts[0]!.value).toBe(`mx1.${d}`); // placeholder restored
   });
 
+  it("treats the zone it's served from as its own (web checks not run)", async () => {
+    mockNet(goodDomain("bluebench.dev"));
+    const check = await session();
+    const r = (await (await check("bluebench.dev")).json()) as DomainReport;
+    expect(r.checks.find((c) => c.id === "headers")!.summary).toContain("own Cloudflare zone");
+  });
+
   it("limits fresh checks of one target domain to 5 a minute", async () => {
     const d = uniq("target");
     mockNet(goodDomain(d));
-    const key = `report:v1:${await sha256Hex(d)}`;
+    const key = `report:v2:${await sha256Hex(d)}`;
     const statuses: number[] = [];
     for (let i = 0; i < 6; i++) {
       const check = await session(); // different sessions and IPs: the limit is per target
