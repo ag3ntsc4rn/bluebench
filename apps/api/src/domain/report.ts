@@ -25,6 +25,8 @@ export interface ReportDeps {
    * sites in its own zone (it answers with an error page), so for those the web checks aren't run.
    */
   selfZone?: string;
+  /** Subrequests this report may use; defaults to REPORT_BUDGET. */
+  budget?: number;
 }
 
 const inZone = (domain: string, zone?: string) => Boolean(zone) && (domain === zone || domain.endsWith(`.${zone}`));
@@ -43,7 +45,7 @@ async function guarded(run: () => Promise<Check> | Check): Promise<Check> {
 
 export async function runReport(domain: string, deps: ReportDeps): Promise<DomainReport> {
   const now = deps.now?.() ?? Date.now();
-  const budget = new Budget(REPORT_BUDGET);
+  const budget = new Budget(deps.budget ?? REPORT_BUDGET);
   const r = new Resolver(budget);
 
   const mxP = getMx(r, domain);
@@ -58,6 +60,14 @@ export async function runReport(domain: string, deps: ReportDeps): Promise<Domai
   const web = (judge: (w: Awaited<ReturnType<typeof probeWeb>>) => Check) => () =>
     webP ? webP.then(judge) : Promise.resolve(notFromInside);
 
+  // The cert check also hands back the certificate it judged; it goes on the report, not in the check.
+  let certificate: DomainReport["certificate"];
+  const cert = async (): Promise<Check> => {
+    const { current, ...check } = await certCheck(domain, { ...deps, budget, now });
+    certificate = current;
+    return check;
+  };
+
   const entries = await Promise.all(
     (
       [
@@ -69,12 +79,19 @@ export async function runReport(domain: string, deps: ReportDeps): Promise<Domai
         ["https", web((w) => httpsCheck(w, domain))],
         ["hsts", web(hstsCheck)],
         ["headers", web(headersCheck)],
-        ["cert", () => certCheck(domain, { ...deps, budget, now })],
+        ["cert", cert],
       ] as [CheckId, () => Promise<Check>][]
     ).map(async ([id, run]) => ({ id, ...(await guarded(run)) })),
   );
 
-  return { ok: true, domain, ...gradeChecks(entries), checks: entries, checkedAt: new Date(now).toISOString() };
+  return {
+    ok: true,
+    domain,
+    ...gradeChecks(entries),
+    checks: entries,
+    checkedAt: new Date(now).toISOString(),
+    ...(certificate && { certificate }),
+  };
 }
 
 const inflight = new Map<string, Promise<DomainReport>>();

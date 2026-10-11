@@ -103,7 +103,8 @@ export type ApiErrorCode =
   | "rate-limited"
   | "daily-limit"
   | "invalid"
-  | "unavailable";
+  | "unavailable"
+  | "signed-out"; // account routes: sign in again
 
 export interface ApiError {
   ok: false;

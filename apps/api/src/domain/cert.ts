@@ -55,7 +55,7 @@ async function readCapped(res: Response, max: number): Promise<string> {
 }
 
 /** crt.sh dates are UTC without a zone: "2026-12-01T12:00:00". */
-const utc = (s: string) => Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(s) ? s : `${s}Z`);
+export const utc = (s: string) => Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(s) ? s : `${s}Z`);
 
 /** Does a certificate's name list cover this exact host (directly or by a one-level wildcard)? */
 export function covers(nameValue: string, domain: string): boolean {
@@ -75,8 +75,11 @@ export function toCertEntries(rows: CtEntry[], domain: string): CertEntry[] {
     .map((e) => ({ issuer: issuerOrg(e.issuer_name ?? ""), notBefore: e.not_before!, notAfter: e.not_after! }));
 }
 
+/** A check plus the certificate it judged, which monitoring uses for expiry alerts. */
+export type CertCheck = Check & { current?: CertEntry };
+
 /** Judge the newest unexpired certificate. Pure, so it can be tested without crt.sh. */
-export function judgeCerts(entries: CertEntry[], now: number): Check {
+export function judgeCerts(entries: CertEntry[], now: number): CertCheck {
   const current = entries.filter((e) => utc(e.notAfter) > now).sort((a, b) => utc(b.notBefore) - utc(a.notBefore));
   if (current.length === 0) {
     // crt.sh often lags or returns partial results, so absence isn't graded; the HTTPS check covers a missing certificate.
@@ -88,9 +91,9 @@ export function judgeCerts(entries: CertEntry[], now: number): Check {
   const when = days <= 0 ? "today" : `in ${days} day${days === 1 ? "" : "s"}`;
   const fix = "Check that automatic renewal is working at your host or certificate provider.";
   // Short-lived certificates (Let's Encrypt is moving to ~45 days) renew with about two weeks left.
-  if (days < 7) return { status: "fail", summary: `The newest certificate expires ${when}.`, fix, facts };
-  if (days < 14) return { status: "warn", summary: `The newest certificate expires ${when}.`, fix, facts };
-  return { status: "pass", summary: `The newest certificate expires ${when}, issued by ${newest.issuer}.`, facts };
+  if (days < 7) return { status: "fail", summary: `The newest certificate expires ${when}.`, fix, facts, current: newest };
+  if (days < 14) return { status: "warn", summary: `The newest certificate expires ${when}.`, fix, facts, current: newest };
+  return { status: "pass", summary: `The newest certificate expires ${when}, issued by ${newest.issuer}.`, facts, current: newest };
 }
 
 export interface CertDeps {
@@ -102,7 +105,7 @@ export interface CertDeps {
 }
 
 /** Certificate expiry and issuer from crt.sh, cached for a day and rate-limited through its quota object. */
-export async function certCheck(domain: string, deps: CertDeps): Promise<Check> {
+export async function certCheck(domain: string, deps: CertDeps): Promise<CertCheck> {
   const { env, budget, now } = deps;
   const key = `cert:v1:${await sha256Hex(domain)}`;
   const cached = await env.VERDICTS.get<{ entries: CertEntry[] }>(key, "json").catch(() => null);
