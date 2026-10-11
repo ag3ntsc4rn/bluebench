@@ -8,7 +8,7 @@ describe("App", () => {
     for (const label of ["Lookup", "Domains", "Alerts", "Respond", "Learn"]) {
       expect(html).toContain(`<span>${label}</span>`);
     }
-    expect(html.match(/<button/g)).toHaveLength(5);
+    expect(/<nav[\s\S]*<\/nav>/.exec(html)![0].match(/<button/g)).toHaveLength(5);
     expect(html).toMatch(/aria-current="page"[^>]*>.*?<span>Lookup<\/span>/);
     expect(html).toContain('for="paste"');
   });
