@@ -27,6 +27,8 @@ export interface ToolRoute {
   lead: string;
   /** Pasted into the box by "Try an example". Must be harmless and detected as this tool's kind. */
   example: string;
+  /** Paste box hint for this tool. */
+  placeholder: string;
   sections: ToolSection[];
 }
 
@@ -43,6 +45,7 @@ export const TOOLS: readonly ToolRoute[] = [
       "Check an IP address, domain, URL or MD5/SHA-1/SHA-256 hash against URLhaus, ThreatFox, MalwareBazaar and Google Safe Browsing. Free, no sign-up, not logged.",
     h1: "IOC lookup",
     lead: "Check an IP address, domain, URL or file hash against public threat intelligence. Paste it defanged or not.",
+    placeholder: "e.g. 203.0.113.7, example.com, a URL or a SHA-256 hash",
     example: "hxxps://example[.]com/login",
     sections: [
       {
@@ -69,6 +72,7 @@ export const TOOLS: readonly ToolRoute[] = [
       "Decode a JWT's header and payload, see expiry and issue times in plain dates, and spot red flags like alg \"none\". Runs in your browser; tokens never leave it.",
     h1: "JWT decoder",
     lead: "Paste a JSON Web Token to see its header, claims and timestamps, with red flags called out.",
+    placeholder: "Paste a token, e.g. eyJhbGciOi…",
     example:
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkV4YW1wbGUgVXNlciIsImlhdCI6MTcwMDAwMDAwMCwiZXhwIjoxNzAwMDAzNjAwfQ.c2lnbmF0dXJlLW5vdC12ZXJpZmllZA",
     sections: [
@@ -91,6 +95,7 @@ export const TOOLS: readonly ToolRoute[] = [
       "Paste raw email headers to see SPF, DKIM and DMARC results, the delivery path with delays, and plain-English phishing red flags. Runs in your browser.",
     h1: "Email header analyzer",
     lead: "Paste the full headers of a suspicious email to see who really sent it, how it travelled and what doesn't add up.",
+    placeholder: "Paste the full headers, starting with Received: or Delivered-To:",
     example: [
       "Received: from mail.example.net (mail.example.net [192.0.2.10]) by mx.example.org with ESMTPS; Tue, 08 Oct 2024 10:00:05 +0000",
       "Received: from [198.51.100.7] by mail.example.net with ESMTP; Tue, 08 Oct 2024 10:00:01 +0000",
@@ -127,6 +132,7 @@ export const TOOLS: readonly ToolRoute[] = [
       "Decode base64 and base64url to text or a hex dump, and recognise what's inside: executables, Office files, archives, PDFs and more. Runs in your browser.",
     h1: "Base64 decoder",
     lead: "Paste base64 (wrapped or not, standard or URL-safe) to see what it decodes to.",
+    placeholder: "e.g. aGVsbG8gd29ybGQ=",
     example: "aHR0cHM6Ly9leGFtcGxlLmNvbS9sb2dpbj9uZXh0PS9hY2NvdW50",
     sections: [
       {
@@ -148,6 +154,7 @@ export const TOOLS: readonly ToolRoute[] = [
       "Decode percent-encoded URLs layer by layer, split out every query parameter, and spot tricks like text before @, bare IPs and punycode. Runs in your browser.",
     h1: "URL decoder",
     lead: "Paste a link or URL-encoded text to decode it fully and see how it's built.",
+    placeholder: "e.g. https://example.com/?next=%2Flogin",
     example: "https://example.com/redirect?to=https%253A%252F%252Fexample.net%252Flogin%253Fuser%253Dyou",
     sections: [
       {

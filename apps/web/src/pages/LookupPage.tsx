@@ -40,6 +40,7 @@ interface LookupPageProps {
   lead?: string;
   /** Offered via "Try an example" while the box is empty. */
   example?: string;
+  placeholder?: string;
 }
 
 export function LookupPage({
@@ -47,6 +48,7 @@ export function LookupPage({
   heading = "Lookup",
   lead = "Paste an IP, domain, URL, hash, email address, JWT, base64 or raw email headers.",
   example,
+  placeholder = "e.g. 203.0.113.7, example.com, a JWT or email headers",
 }: LookupPageProps) {
   const [input, setInput] = useState(initialValue);
   const [chosen, setChosen] = useState<IndicatorKind | null>(null);
@@ -92,7 +94,7 @@ export function LookupPage({
           spellCheck={false}
           autoComplete="off"
           autoCapitalize="off"
-          placeholder="e.g. 203.0.113.7 or example.com"
+          placeholder={placeholder}
           // One-line indicators: the return key reads "Go" and shows results. Multi-line text (headers) keeps newlines.
           enterKeyHint={multiline ? "enter" : "go"}
           value={input}

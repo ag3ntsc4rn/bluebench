@@ -16,6 +16,10 @@ describe("routes", () => {
     expect(detect(tool.example)[0]?.kind).toBe(EXPECTED_KIND[slug]);
   });
 
+  it("every tool has its own placeholder", () => {
+    expect(new Set(TOOLS.map((t) => t.placeholder)).size).toBe(TOOLS.length);
+  });
+
   it("the JWT example decodes", () => {
     expect(decodeJwt(TOOLS.find((t) => t.slug === "jwt-decoder")!.example)).not.toBeNull();
   });

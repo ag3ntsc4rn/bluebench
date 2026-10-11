@@ -157,15 +157,17 @@ export function hstsCheck(probe: WebProbe): Check {
   return { status: "pass", summary: `HSTS is on for a year or more${extras ? ` (${extras})` : ""}.`, facts };
 }
 
-const HEADER_CHECKS: { name: string; present: (h: Headers) => boolean }[] = [
-  { name: "Content-Security-Policy", present: (h) => h.has("content-security-policy") },
-  { name: "X-Content-Type-Options", present: (h) => /nosniff/i.test(h.get("x-content-type-options") ?? "") },
+/** `label` is the short form shown in the facts list; `name` is used in the fix text. */
+const HEADER_CHECKS: { label: string; name: string; present: (h: Headers) => boolean }[] = [
+  { label: "CSP", name: "Content-Security-Policy", present: (h) => h.has("content-security-policy") },
+  { label: "nosniff", name: "X-Content-Type-Options: nosniff", present: (h) => /nosniff/i.test(h.get("x-content-type-options") ?? "") },
   {
-    name: "Clickjacking protection (X-Frame-Options or frame-ancestors)",
+    label: "Framing",
+    name: "clickjacking protection (X-Frame-Options or CSP frame-ancestors)",
     present: (h) => h.has("x-frame-options") || /frame-ancestors/i.test(h.get("content-security-policy") ?? ""),
   },
-  { name: "Referrer-Policy", present: (h) => h.has("referrer-policy") },
-  { name: "Permissions-Policy", present: (h) => h.has("permissions-policy") },
+  { label: "Referrer-Policy", name: "Referrer-Policy", present: (h) => h.has("referrer-policy") },
+  { label: "Permissions-Policy", name: "Permissions-Policy", present: (h) => h.has("permissions-policy") },
 ];
 
 export function headersCheck(probe: WebProbe): Check {
@@ -178,7 +180,7 @@ export function headersCheck(probe: WebProbe): Check {
   const final = probe.https.hops.at(-1)!;
   const missing = HEADER_CHECKS.filter((c) => !c.present(final.headers)).map((c) => c.name);
   const have = HEADER_CHECKS.length - missing.length;
-  const facts = HEADER_CHECKS.map((c) => fact(c.name, missing.includes(c.name) ? "missing" : "present"));
+  const facts = HEADER_CHECKS.map((c) => fact(c.label, missing.includes(c.name) ? "missing" : "present"));
   if (missing.length === 0) return { status: "pass", summary: "All five recommended security headers are set.", facts };
   const fix = `Add ${missing.join(", ")} at your web server or CDN.`;
   if (have >= 3) return { status: "warn", summary: `${have} of 5 recommended security headers are set.`, fix, facts };

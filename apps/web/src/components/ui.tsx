@@ -98,10 +98,11 @@ export function CodeBlock({ children, label }: { children: string; label?: strin
 /** Two-column facts list. Values render in mono unless `plain` is set. */
 export function Facts({ rows }: { rows: [label: string, value: ReactNode, plain?: boolean][] }) {
   return (
-    <dl className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-4 gap-y-2 text-sm">
+    // The label column is capped at 40% so a long label can't squeeze values down to one letter per line.
+    <dl className="grid grid-cols-[minmax(6rem,40%)_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">
       {rows.map(([label, value, plain]) => (
         <div key={label} className="contents">
-          <dt className="text-muted">{label}</dt>
+          <dt className="min-w-0 break-words text-muted">{label}</dt>
           <dd className={plain ? "min-w-0 break-words" : "min-w-0 font-mono break-all"}>{value}</dd>
         </div>
       ))}
