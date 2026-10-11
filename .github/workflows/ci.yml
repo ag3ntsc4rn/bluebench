@@ -1,7 +1,9 @@
 name: CI
 
 on:
+  # PRs get CI via pull_request; push only on main (which also deploys), so PR branches don't run twice.
   push:
+    branches: [main]
   pull_request:
 
 permissions:
