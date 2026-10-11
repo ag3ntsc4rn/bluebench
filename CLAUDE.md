@@ -38,6 +38,12 @@ packages/shared   types, indicator detection, validation (zod), used by both
   - The merged verdict is `listed` / `not-listed` / `incomplete`, never "clean".
   - A missing secret switches a source (or lookups) off with a plain message; it never crashes.
   - `apps/api/src/safe-fetch.ts` is the SSRF guard for M4's user-supplied hosts.
+- Domain report card (M4):
+  - `POST /api/domain` (`apps/api/src/domain/`) uses the same session, per-minute and daily limits as lookups (one report = one unit of the daily cap). It adds `TARGET_LIMITER`: 5 fresh reports per minute per target domain, keyed by hash, so nobody can use us to hammer a site.
+  - Every report runs on a 45-subrequest budget (`Budget` in `dns.ts`; the free plan allows 50). DNS goes through one memoised `Resolver`. A check that can't get budget reports `skipped`, which isn't graded.
+  - Grading weights and letter cut-offs live in `packages/shared/src/domain-report.ts`. `pass` = full credit, `warn` = half, `fail` = none; `info` and `skipped` drop out of the total.
+  - Site fetches use `safeFetch` with the shared resolver, the budget hook and the `Bluebench/1.0` user agent. The HTTPS probe returns at the 3-redirect cap instead of failing. Plain HTTP passes if its chain reaches `https://`.
+  - crt.sh is unreliable (502s, empty answers). We retry once with `match==`. Empty answers are `skipped` and not cached. Results are cached 24 h and the reports themselves 1 h, both under hashed keys with the domain redacted (`src/redact.ts`). Certificates warn under 14 days and fail under 7, because short-lived certificates (Let's Encrypt ~45 days) renew with about two weeks left.
 - Routes and SEO: every URL is listed in `apps/web/src/routes.ts`: home, `/privacy`, one landing page per tool (`/ioc-lookup`, `/jwt-decoder`, …) and the 404 page. The build pre-renders each route to its own HTML file in `dist`, with its own title, description, canonical URL and Open Graph tags, and writes `sitemap.xml` (`prerender()` in `apps/web/vite.config.ts` plus `src/prerender.tsx`). `main.tsx` hydrates that HTML. Assets use `not_found_handling: "404-page"`, so unknown paths get a real 404. To add a page, add it to `routes.ts`. `public/og.png` (the link-preview image) is rendered from `apps/web/scripts/og-image.html`; that file explains how to regenerate it.
 - `public/robots.txt` and `public/.well-known/security.txt` (contact: security@bluebench.dev; renew its `Expires` date before 2027-10-01).
 - The privacy policy lives at `/privacy` (`apps/web/src/pages/PrivacyPage.tsx`), linked from every page's footer. Update it, and its date, **before** shipping any change to what data leaves the browser, is stored, or which third parties see it. It must keep linking Cloudflare's Turnstile Privacy Addendum: that's a condition of the invisible Turnstile widget. Contact: privacy@bluebench.dev (Cloudflare Email Routing).
@@ -122,7 +128,7 @@ Out of scope for v1: CVE feed, one-time secrets, incident runbook, phishing quiz
 1. ✅ **Scaffold & deploy** — monorepo, web + api skeletons, shared package, Vitest, GitHub Actions deploy, "hello" page live on bluebench.dev
 2. ✅ **Browser-only tools** — paste box with detection, decoders, email header analyzer
 3. ✅ **Lookup API** — abuse.ch + Safe Browsing, KV cache, provider Durable Objects, Turnstile, rate limits, SSRF guard
-4. **Domain report card** — DNS checks, headers, crt.sh cert expiry
+4. ✅ **Domain report card** — DNS checks, headers, crt.sh cert expiry
 5. **Accounts & monitoring** — Better Auth magic link, saved domains, TXT verification, daily cron, push + email alerts
 6. **Finish v1** — lookalike watcher, BYO keys, About page, donate links
 
