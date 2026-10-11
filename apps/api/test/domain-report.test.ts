@@ -198,6 +198,18 @@ describe("runReport", () => {
     expect(byId(await runReport(uniq(), { ...deps, selfZone: "bluebench.dev" })).https.status).not.toBe("skipped");
   });
 
+  it("fails HTTPS on a server error page and doesn't grade the error page's headers", async () => {
+    const d = uniq();
+    const net = goodDomain(d);
+    net.sites![`https://${d}/`] = { status: 522, headers: { "x-frame-options": "SAMEORIGIN", "referrer-policy": "same-origin" } };
+    mockNet(net);
+    const c = byId(await runReport(d, deps));
+    expect(c.https).toMatchObject({ status: "fail", summary: expect.stringContaining("server error (522)") });
+    expect(c.https.facts).toContainEqual({ label: "HTTPS response", value: `522 from https://${d}/` });
+    expect(c.hsts.status).toBe("skipped");
+    expect(c.headers.status).toBe("skipped");
+  });
+
   it("treats a domain with no address as having no website (not a failure)", async () => {
     const d = uniq();
     mockNet({ dns: { [d]: { MX: [`10 mx.${d}.`] } }, crtsh: [] });

@@ -87,6 +87,18 @@ export async function probeWeb(r: Resolver, budget: Budget, domain: string): Pro
   return { hasAddress, https, http };
 }
 
+/** A 5xx anywhere in the HTTPS chain means we got an error page (e.g. Cloudflare's 522), not the site. */
+const serverError = (probe: WebProbe): number | null => {
+  if ("error" in probe.https) return null;
+  const bad = probe.https.hops.find((h) => h.status >= 500);
+  return bad ? bad.status : null;
+};
+const ERROR_PAGE = (status: number): Check => ({
+  status: "skipped",
+  summary: `Skipped: the site answered with a server error (${status}), so its headers aren't the site's.`,
+  facts: [],
+});
+
 const NO_SITE: Check = { status: "info", summary: "No website at this domain, so there's nothing to check.", facts: [] };
 const skipped = (why: string): Check => ({ status: "skipped", summary: `Couldn't check this time (${why}).`, facts: [] });
 
@@ -102,6 +114,15 @@ export function httpsCheck(probe: WebProbe, domain: string): Check {
     };
   }
   const final = probe.https.hops.at(-1)!;
+  const error = serverError(probe);
+  if (error) {
+    return {
+      status: "fail",
+      summary: `The site answered over HTTPS with a server error (${error}), so it isn't loading.`,
+      fix: "Check the web server or hosting is up and reachable; a 52x code means the CDN can't reach the origin server.",
+      facts: [fact("HTTPS response", `${error} from ${final.url}`)],
+    };
+  }
   const facts = [
     fact("HTTPS response", probe.https.redirectLimitHit ? `stopped after ${probe.https.hops.length} redirects` : `${final.status} from ${final.url}`),
   ];
@@ -131,6 +152,8 @@ export function parseHsts(header: string): { maxAge: number; includeSubDomains: 
 export function hstsCheck(probe: WebProbe): Check {
   if (!probe.hasAddress) return NO_SITE;
   if ("error" in probe.https) return { status: "skipped", summary: "Skipped: the site doesn't load over HTTPS.", facts: [] };
+  const errorHsts = serverError(probe);
+  if (errorHsts) return ERROR_PAGE(errorHsts);
   // HSTS on the first HTTPS response protects this exact host, even if it then redirects (e.g. to www).
   const header = probe.https.hops[0]!.headers.get("strict-transport-security");
   const fix = "Send Strict-Transport-Security: max-age=31536000; includeSubDomains on every HTTPS response.";
@@ -173,6 +196,8 @@ const HEADER_CHECKS: { label: string; name: string; present: (h: Headers) => boo
 export function headersCheck(probe: WebProbe): Check {
   if (!probe.hasAddress) return NO_SITE;
   if ("error" in probe.https) return { status: "skipped", summary: "Skipped: the site doesn't load over HTTPS.", facts: [] };
+  const error = serverError(probe);
+  if (error) return ERROR_PAGE(error);
   if (probe.https.redirectLimitHit) {
     // Headers on a redirect aren't the page's headers; we don't follow further to find the page.
     return { status: "skipped", summary: "Skipped: the home page redirects more than 3 times, and we stop there.", facts: [] };
