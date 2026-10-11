@@ -57,6 +57,17 @@ describe("LookupPage", () => {
     expect(html.match(/>Pass</g)).toHaveLength(3);
   });
 
+  it("has an Analyse button, disabled until there is input", () => {
+    const analyse = (value: string) => /<button([^>]*)>Analyse<\/button>/.exec(render(value))![1];
+    expect(analyse("")).toContain('disabled=""');
+    expect(analyse("8.8.8.8")).not.toContain('disabled=""');
+  });
+
+  it("labels the return key Go for one-line input and Enter for multi-line", () => {
+    expect(render("8.8.8.8")).toContain('enterKeyHint="go"');
+    expect(render("From: a@x.com\nTo: b@y.com\nSubject: s")).toContain('enterKeyHint="enter"');
+  });
+
   it("never uses inline style attributes (CSP forbids them)", () => {
     const html = render("Received: from a by b; Tue, 08 Oct 2024 10:00:00 +0000\nFrom: a@x.com\nSubject: s");
     expect(html).not.toMatch(/\sstyle="/);

@@ -1,5 +1,5 @@
 import { detect, KIND_LABELS, MAX_PASTE_LENGTH, type Detection, type IndicatorKind } from "@bluebench/shared";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useRef, useState } from "react";
 import { Base64Tool } from "../components/tools/Base64Tool";
 import { HeaderTool } from "../components/tools/HeaderTool";
 import { IndicatorTool } from "../components/tools/IndicatorTool";
@@ -43,9 +43,21 @@ export function LookupPage({ initialValue = "" }: { initialValue?: string }) {
   const active = detections.find((d) => d.kind === chosen) ?? detections[0];
   const atLimit = input.length >= MAX_PASTE_LENGTH;
 
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const multiline = input.includes("\n");
+
   const replaceInput = (text: string) => {
     setInput(text.slice(0, MAX_PASTE_LENGTH));
     setChosen(null);
+  };
+
+  // Detection is already live; this closes the phone keyboard and brings the results into view.
+  const showResults = () => {
+    const results = resultsRef.current;
+    if (!results) return;
+    results.focus({ preventScroll: true });
+    const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    requestAnimationFrame(() => results.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" }));
   };
 
   return (
@@ -70,21 +82,37 @@ export function LookupPage({ initialValue = "" }: { initialValue?: string }) {
           autoComplete="off"
           autoCapitalize="off"
           placeholder="e.g. 203.0.113.7 or example.com"
+          // One-line indicators: the return key reads "Go" and shows results. Multi-line text (headers) keeps newlines.
+          enterKeyHint={multiline ? "enter" : "go"}
           value={input}
           onChange={(e) => replaceInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !multiline && input.trim()) {
+              e.preventDefault();
+              showResults();
+            }
+          }}
           className="mt-2 w-full resize-y rounded-md border border-border bg-ground p-3 font-mono text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none"
         />
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-muted">
-            {atLimit
-              ? "Limit reached: only the first 64 KB is analysed."
-              : "Runs in your browser. Nothing you paste is sent or stored."}
-          </p>
+        <p className="mt-2 text-sm text-muted">
+          {atLimit
+            ? "Limit reached: only the first 64 KB is analysed."
+            : "Runs in your browser. Nothing you paste is sent or stored."}
+        </p>
+        <div className="mt-3 flex gap-2">
+          <button
+            type="button"
+            onClick={showResults}
+            disabled={!input.trim()}
+            className="min-h-11 flex-1 rounded-md bg-accent px-4 text-sm font-medium text-on-accent disabled:opacity-50 sm:flex-none"
+          >
+            Analyse
+          </button>
           {input && (
             <button
               type="button"
               onClick={() => replaceInput("")}
-              className="min-h-11 rounded-md border border-border px-3 text-sm text-muted hover:text-fg"
+              className="min-h-11 rounded-md border border-border px-4 text-sm text-muted hover:text-fg"
             >
               Clear
             </button>
@@ -92,36 +120,38 @@ export function LookupPage({ initialValue = "" }: { initialValue?: string }) {
         </div>
       </div>
 
-      {active && (
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Detected type">
-            <span className="text-sm text-muted">Detected:</span>
-            {detections.map((d) => (
-              <button
-                key={d.kind}
-                type="button"
-                aria-pressed={d.kind === active.kind}
-                onClick={() => setChosen(d.kind)}
-                className={[
-                  "min-h-11 rounded-full border px-4 text-sm font-medium",
-                  d.kind === active.kind ? "border-accent bg-accent text-on-accent" : "border-border text-muted hover:text-fg",
-                ].join(" ")}
-              >
-                {CHIP_LABELS[d.kind] ?? KIND_LABELS[d.kind]}
-              </button>
-            ))}
+      <div ref={resultsRef} tabIndex={-1} aria-label="Results" className="scroll-mt-4 space-y-4 focus:outline-none">
+        {active && (
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Detected type">
+              <span className="text-sm text-muted">Detected:</span>
+              {detections.map((d) => (
+                <button
+                  key={d.kind}
+                  type="button"
+                  aria-pressed={d.kind === active.kind}
+                  onClick={() => setChosen(d.kind)}
+                  className={[
+                    "min-h-11 rounded-full border px-4 text-sm font-medium",
+                    d.kind === active.kind ? "border-accent bg-accent text-on-accent" : "border-border text-muted hover:text-fg",
+                  ].join(" ")}
+                >
+                  {CHIP_LABELS[d.kind] ?? KIND_LABELS[d.kind]}
+                </button>
+              ))}
+            </div>
+            {active.refanged && <p className="text-sm text-muted">Defanged input was refanged for analysis.</p>}
           </div>
-          {active.refanged && <p className="text-sm text-muted">Defanged input was refanged for analysis.</p>}
-        </div>
-      )}
+        )}
 
-      {deferred.trim() && !active && (
-        <p className="rounded-lg border border-border bg-surface p-4 text-sm text-muted">
-          Couldn't recognise this. Paste one indicator at a time, or the full headers of an email.
-        </p>
-      )}
+        {deferred.trim() && !active && (
+          <p className="rounded-lg border border-border bg-surface p-4 text-sm text-muted">
+            Couldn't recognise this. Paste one indicator at a time, or the full headers of an email.
+          </p>
+        )}
 
-      {active && <Tool key={`${active.kind}:${active.value}`} detection={active} onUseAsInput={replaceInput} />}
+        {active && <Tool key={`${active.kind}:${active.value}`} detection={active} onUseAsInput={replaceInput} />}
+      </div>
     </section>
   );
 }
