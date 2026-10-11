@@ -9,7 +9,7 @@ See [CLAUDE.md](CLAUDE.md) for the project brief, principles and roadmap.
 ```
 apps/web         React + Vite + Tailwind PWA (built to apps/web/dist)
 apps/api         Hono on Cloudflare Workers; serves /api/* and the web build as static assets
-packages/shared  Code shared by both (security headers, API types)
+packages/shared  Code shared by both (indicator detection, IP/domain helpers, security headers, API types)
 ```
 
 One Worker serves the whole site on bluebench.dev. Only `/api/*` runs Worker code; everything else is served straight from static assets.
