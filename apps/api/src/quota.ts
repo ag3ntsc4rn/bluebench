@@ -32,6 +32,9 @@ export const ANON_SHARE = 0.6;
 /** Lookups per UTC day for an anonymous session or IP group. */
 export const ANON_DAILY_LIMIT = 100;
 
+/** Lookups per UTC day for a signed-in account. */
+export const USER_DAILY_LIMIT = 300;
+
 export type QuotaDenial = "rate" | "daily";
 
 export const utcDay = (now = Date.now()) => new Date(now).toISOString().slice(0, 10);
@@ -93,15 +96,25 @@ export class UsageCounter extends DurableObject<Env> {
 
   /** Count one lookup against every key, unless any key is already at `limit`. */
   consume(keys: string[], limit: number, now = Date.now()): { ok: boolean; used: number } {
+    return this.consumeLimits(
+      keys.map((k) => [k, limit]),
+      now,
+    );
+  }
+
+  /** Count one against every key, unless any key is already at its own limit. `used` is the highest count. */
+  consumeLimits(limits: [key: string, limit: number][], now = Date.now()): { ok: boolean; used: number } {
     const day = utcDay(now);
     const sql = this.ctx.storage.sql;
     let used = 0;
-    for (const key of keys) {
-      const row = sql.exec<{ n: number }>("SELECT n FROM usage WHERE day = ? AND key = ?", day, key).toArray()[0];
-      used = Math.max(used, row?.n ?? 0);
+    let over = false;
+    for (const [key, limit] of limits) {
+      const n = sql.exec<{ n: number }>("SELECT n FROM usage WHERE day = ? AND key = ?", day, key).toArray()[0]?.n ?? 0;
+      used = Math.max(used, n);
+      if (n >= limit) over = true;
     }
-    if (used >= limit) return { ok: false, used };
-    for (const key of keys) {
+    if (over) return { ok: false, used };
+    for (const [key] of limits) {
       sql.exec(
         "INSERT INTO usage (day, key, n) VALUES (?, ?, 1) ON CONFLICT(day, key) DO UPDATE SET n = n + 1",
         day,
