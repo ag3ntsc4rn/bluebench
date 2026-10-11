@@ -2,7 +2,8 @@ import { env, exports } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cacheKey, ipRateKey, SECURITY_HEADERS, type ApiError, type LookupResponse } from "@bluebench/shared";
-import { ANON_DAILY_LIMIT } from "../src/index.ts";
+import * as main from "../src/index.ts";
+import { ANON_DAILY_LIMIT } from "../src/quota.ts";
 import { hmac } from "../src/session.ts";
 import { mockUpstream } from "./upstream.ts";
 
@@ -46,6 +47,14 @@ async function cached(kind: "domain" | "url" | "sha256", value: string) {
 }
 
 afterEach(() => vi.restoreAllMocks());
+
+describe("main module", () => {
+  it("exports only handlers and classes (workerd rejects anything else at startup)", () => {
+    for (const [name, value] of Object.entries(main)) {
+      expect(typeof value === "function" || typeof (value as { fetch?: unknown }).fetch === "function", name).toBe(true);
+    }
+  });
+});
 
 describe("POST /api/session", () => {
   it("sets a hardened session cookie for a valid Turnstile token", async () => {

@@ -22,6 +22,9 @@ export const PROVIDER_LIMITS: Readonly<Record<SourceId, ProviderLimits>> = {
 /** Anonymous traffic may spend at most this share of a provider's daily budget. */
 export const ANON_SHARE = 0.6;
 
+/** Lookups per UTC day for an anonymous session or IP group. */
+export const ANON_DAILY_LIMIT = 100;
+
 export type QuotaDenial = "rate" | "daily";
 
 export const utcDay = (now = Date.now()) => new Date(now).toISOString().slice(0, 10);

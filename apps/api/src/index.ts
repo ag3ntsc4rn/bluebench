@@ -13,13 +13,12 @@ import {
 } from "@bluebench/shared";
 import type { Env } from "./env.ts";
 import { lookup } from "./lookup.ts";
+import { ANON_DAILY_LIMIT } from "./quota.ts";
 import { hmac, SESSION_COOKIE, SESSION_TTL_SECONDS, signSession, verifySession, verifyTurnstile } from "./session.ts";
 
 export { ProviderQuota, UsageCounter } from "./quota.ts";
 export type { Env };
-
-/** Lookups per UTC day for an anonymous session or IP group. */
-export const ANON_DAILY_LIMIT = 100;
+// Only handlers and Durable Object classes may be exported from the main module; workerd refuses anything else.
 
 type Ctx = Context<{ Bindings: Env }>;
 
