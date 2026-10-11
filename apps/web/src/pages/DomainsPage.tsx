@@ -1,8 +1,9 @@
 import { CHECK_LABELS, type ApiError, type CheckStatus, type DomainCheck, type DomainReport, type Grade } from "@bluebench/shared";
 import { useRef, useState, type FormEvent } from "react";
-import { Badge, Facts, type Tone } from "../components/ui";
+import { Badge, CopyButton, Facts, type Tone } from "../components/ui";
 import { checkDomain } from "../lib/api";
 import { domainFromInput } from "../lib/domain-input";
+import { summarizeDomain } from "../lib/summaries";
 import { runTurnstile } from "../lib/turnstile";
 
 const GRADE: Record<Grade, { tone: Tone; text: string }> = {
@@ -63,7 +64,7 @@ export function DomainReportView({ report }: { report: DomainReport }) {
         >
           {report.grade}
         </p>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h2 className="font-mono text-base break-all">{report.domain}</h2>
           <p className="text-sm">
             Grade {report.grade} ({report.score}/100). {grade.text}
@@ -73,6 +74,7 @@ export function DomainReportView({ report }: { report: DomainReport }) {
             {report.cached ? " (cached; results refresh hourly)" : ""}
           </p>
         </div>
+        <CopyButton value={summarizeDomain(report)} label="Copy result" />
       </div>
       <ul className="space-y-3">
         {checks.map((c) => (

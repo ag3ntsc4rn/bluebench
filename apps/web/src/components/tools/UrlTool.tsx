@@ -1,12 +1,13 @@
 import { analyzeUrl, decodeLayers } from "../../lib/url";
-import { CodeBlock, Facts, FindingList, Panel } from "../ui";
+import { summarizeUrl } from "../../lib/summaries";
+import { CodeBlock, CopyButton, Facts, FindingList, Panel } from "../ui";
 import { Reputation } from "./Reputation";
 
 export function UrlTool({ href }: { href: string }) {
   const url = analyzeUrl(href);
   if (!url) return <Panel title="URL">Couldn't parse this URL.</Panel>;
   return (
-    <Panel title="URL">
+    <Panel title="URL" aside={<CopyButton value={summarizeUrl(url)} label="Copy result" />}>
       <FindingList findings={url.findings} empty="Nothing unusual in how this URL is built." />
       <Facts
         rows={[

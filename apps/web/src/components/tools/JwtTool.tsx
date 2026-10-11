@@ -1,11 +1,12 @@
 import { decodeJwt } from "../../lib/jwt";
-import { CodeBlock, Facts, FindingList, Panel } from "../ui";
+import { summarizeJwt } from "../../lib/summaries";
+import { CodeBlock, CopyButton, Facts, FindingList, Panel } from "../ui";
 
 export function JwtTool({ token }: { token: string }) {
   const jwt = decodeJwt(token);
   if (!jwt) return <Panel title="JWT">Couldn't decode this token.</Panel>;
   return (
-    <Panel title="JWT">
+    <Panel title="JWT" aside={<CopyButton value={summarizeJwt(jwt)} label="Copy result" />}>
       <FindingList findings={jwt.findings} />
       {jwt.times.length > 0 && <Facts rows={jwt.times.map((t) => [t.label, t.display])} />}
       <CodeBlock label="Header">{JSON.stringify(jwt.header, null, 2)}</CodeBlock>
