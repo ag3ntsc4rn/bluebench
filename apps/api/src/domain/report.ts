@@ -20,7 +20,14 @@ export interface ReportDeps {
   tier: Tier;
   waitUntil(p: Promise<unknown>): void;
   now?: () => number;
+  /**
+   * The zone Bluebench itself is served from (e.g. bluebench.dev). Cloudflare doesn't let a Worker fetch
+   * sites in its own zone (it answers with an error page), so for those the web checks aren't run.
+   */
+  selfZone?: string;
 }
+
+const inZone = (domain: string, zone?: string) => Boolean(zone) && (domain === zone || domain.endsWith(`.${zone}`));
 
 type Check = Omit<DomainCheck, "id">;
 
@@ -41,7 +48,15 @@ export async function runReport(domain: string, deps: ReportDeps): Promise<Domai
 
   const mxP = getMx(r, domain);
   const receivesMail = mxP.then((mx) => mx.hosts.length > 0).catch(() => true);
-  const webP = probeWeb(r, budget, domain);
+  const self = inZone(domain, deps.selfZone);
+  const webP = self ? null : probeWeb(r, budget, domain);
+  const notFromInside: Check = {
+    status: "skipped",
+    summary: `Not checked: Bluebench runs inside ${deps.selfZone}'s own Cloudflare zone, and Cloudflare won't let it fetch its own site. Check from outside, e.g. curl -I https://${domain}/`,
+    facts: [],
+  };
+  const web = (judge: (w: Awaited<ReturnType<typeof probeWeb>>) => Check) => () =>
+    webP ? webP.then(judge) : Promise.resolve(notFromInside);
 
   const entries = await Promise.all(
     (
@@ -51,9 +66,9 @@ export async function runReport(domain: string, deps: ReportDeps): Promise<Domai
         ["dmarc", async () => dmarcCheck(r, domain, await receivesMail)],
         ["dkim", async () => dkimCheck(r, domain, await receivesMail)],
         ["dnssec", () => mxP.then((mx) => dnssecCheck(mx.answer))],
-        ["https", () => webP.then((w) => httpsCheck(w, domain))],
-        ["hsts", () => webP.then(hstsCheck)],
-        ["headers", () => webP.then(headersCheck)],
+        ["https", web((w) => httpsCheck(w, domain))],
+        ["hsts", web(hstsCheck)],
+        ["headers", web(headersCheck)],
         ["cert", () => certCheck(domain, { ...deps, budget, now })],
       ] as [CheckId, () => Promise<Check>][]
     ).map(async ([id, run]) => ({ id, ...(await guarded(run)) })),
@@ -66,7 +81,7 @@ const inflight = new Map<string, Promise<DomainReport>>();
 
 /** Cached for an hour under a hashed key; concurrent requests for the same domain share one run. */
 export async function domainReport(domain: string, deps: ReportDeps): Promise<DomainReport> {
-  const key = `report:v1:${await sha256Hex(domain)}`;
+  const key = `report:v2:${await sha256Hex(domain)}`;
   const cached = await deps.env.VERDICTS.get<DomainReport>(key, "json").catch(() => null);
   if (cached) return { ...restore(cached, domain), domain, cached: true };
 
@@ -88,5 +103,5 @@ export async function domainReport(domain: string, deps: ReportDeps): Promise<Do
 
 /** True when a cached report exists, so the per-target limit needn't be spent. */
 export async function hasCachedReport(env: Env, domain: string): Promise<boolean> {
-  return (await env.VERDICTS.get(`report:v1:${await sha256Hex(domain)}`).catch(() => null)) !== null;
+  return (await env.VERDICTS.get(`report:v2:${await sha256Hex(domain)}`).catch(() => null)) !== null;
 }
