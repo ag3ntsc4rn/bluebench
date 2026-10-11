@@ -1,5 +1,6 @@
 import { analyzeHeaders, type AuthMethod, type AuthResult } from "../../lib/email-headers";
-import { Badge, Facts, FindingList, Panel, type Tone } from "../ui";
+import { summarizeHeaders } from "../../lib/summaries";
+import { Badge, CopyButton, Facts, FindingList, Panel, type Tone } from "../ui";
 
 const METHOD_LABELS: Record<AuthMethod, string> = { spf: "SPF", dkim: "DKIM", dmarc: "DMARC" };
 
@@ -34,7 +35,7 @@ export function HeaderTool({ raw }: { raw: string }) {
 
   return (
     <>
-      <Panel title="Email headers">
+      <Panel title="Email headers" aside={<CopyButton value={summarizeHeaders(a)} label="Copy result" />}>
         <FindingList
           findings={a.findings}
           empty="No red flags found. That isn't proof the message is safe: check links and attachments too."

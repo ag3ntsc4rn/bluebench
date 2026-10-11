@@ -11,7 +11,8 @@ import {
 import { useRef, useState } from "react";
 import { lookupReputation } from "../../lib/api";
 import { runTurnstile } from "../../lib/turnstile";
-import { Badge, Facts, type Tone } from "../ui";
+import { summarizeLookup } from "../../lib/summaries";
+import { Badge, CopyButton, Facts, type Tone } from "../ui";
 
 const VERDICT: Record<Verdict, { tone: Tone; label: string; text: string }> = {
   listed: { tone: "critical", label: "Listed", text: "At least one source lists this. Treat it as suspicious." },
@@ -82,9 +83,12 @@ export function ReputationResult({ result }: { result: LookupResponse }) {
   const verdict = VERDICT[result.verdict];
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-2">
-        <Badge tone={verdict.tone}>{verdict.label}</Badge>
-        <p className="text-sm">{verdict.text}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-2">
+          <Badge tone={verdict.tone}>{verdict.label}</Badge>
+          <p className="text-sm">{verdict.text}</p>
+        </div>
+        <CopyButton value={summarizeLookup(result)} label="Copy result" />
       </div>
       <ul className="space-y-3">
         {result.sources.map((s) => (
