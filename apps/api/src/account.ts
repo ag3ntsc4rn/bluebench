@@ -35,6 +35,8 @@ export const account = new Hono<{ Bindings: Env }>();
 /** Magic links per address, and per browser session, per UTC day. */
 const SIGNIN_PER_EMAIL_DAILY = 5;
 const SIGNIN_PER_SESSION_DAILY = 10;
+/** Account changes (saving domains, push subscriptions, settings) per account per UTC day: D1 allows 100k row writes a day. */
+const WRITES_PER_ACCOUNT_DAILY = 200;
 const HISTORY_LIMIT = 50;
 
 const accountsOff = (c: Ctx) =>
@@ -48,6 +50,21 @@ async function requireUser(c: Ctx): Promise<UserGate> {
   if (!accountsEnabled(c.env)) return { ok: false, res: accountsOff(c) };
   const u = await currentUser(c.env, c.req.raw.headers);
   return u ? { ok: true, user: u } : { ok: false, res: signedOut(c) };
+}
+
+/** A signed-in user who may still make changes: 30 a minute and WRITES_PER_ACCOUNT_DAILY a day. */
+async function requireWriter(c: Ctx): Promise<UserGate> {
+  const g = await requireUser(c);
+  if (!g.ok) return g;
+  if (!(await c.env.IP_LIMITER.limit({ key: `write:${g.user.id}` })).success) {
+    return { ok: false, res: tooFast(c, "That's a lot of changes in a minute. Wait a moment and try again.") };
+  }
+  const usage = c.env.USAGE.get(c.env.USAGE.idFromName("daily"));
+  const key = await hmac(c.env.BETTER_AUTH_SECRET!, `writes:${g.user.id}`);
+  if (!(await usage.consume([key], WRITES_PER_ACCOUNT_DAILY)).ok) {
+    return { ok: false, res: fail(c, 429, { error: "daily-limit", message: "That's a lot of changes for one day. Try again tomorrow." }) };
+  }
+  return g;
 }
 
 function me(env: Env, u: AccountUser | null): Me {
@@ -138,7 +155,7 @@ account.post("/signout", async (c) => {
 });
 
 account.patch("/account", async (c) => {
-  const g = await requireUser(c);
+  const g = await requireWriter(c);
   if (!g.ok) return g.res;
   const body = await readJson(c);
   if (!body.ok) return body.res;
@@ -166,7 +183,7 @@ account.get("/domains", async (c) => {
 });
 
 account.post("/domains", async (c) => {
-  const g = await requireUser(c);
+  const g = await requireWriter(c);
   if (!g.ok) return g.res;
   const body = await readJson(c);
   if (!body.ok) return body.res;
@@ -190,7 +207,7 @@ account.post("/domains", async (c) => {
 
 /** Look for the TXT record now. Once found, the domain is checked daily and alerts start. */
 account.post("/domains/:id/verify", async (c) => {
-  const g = await requireUser(c);
+  const g = await requireWriter(c);
   if (!g.ok) return g.res;
   if (!(await c.env.TOKEN_LIMITER.limit({ key: `verify:${g.user.id}` })).success) return tooFast(c, "Wait a minute before checking again.");
   const d = db(c.env);
@@ -215,7 +232,7 @@ account.post("/domains/:id/verify", async (c) => {
 });
 
 account.delete("/domains/:id", async (c) => {
-  const g = await requireUser(c);
+  const g = await requireWriter(c);
   if (!g.ok) return g.res;
   await db(c.env).delete(domain).where(and(eq(domain.id, c.req.param("id")), eq(domain.userId, g.user.id)));
   return c.json({ ok: true });
@@ -239,7 +256,7 @@ account.get("/alerts", async (c) => {
 
 /** Save this browser's push subscription. Endpoints must belong to a known push service. */
 account.post("/push", async (c) => {
-  const g = await requireUser(c);
+  const g = await requireWriter(c);
   if (!g.ok) return g.res;
   if (!vapidKeys(c.env)) return fail(c, 503, { error: "unavailable", message: "Push notifications aren't switched on yet. Alerts will come by email." });
   const body = await readJson(c);
@@ -259,7 +276,7 @@ account.post("/push", async (c) => {
 });
 
 account.delete("/push", async (c) => {
-  const g = await requireUser(c);
+  const g = await requireWriter(c);
   if (!g.ok) return g.res;
   const body = await readJson(c);
   if (!body.ok) return body.res;
@@ -273,7 +290,7 @@ account.delete("/push", async (c) => {
 
 /** Send a test notification to every device on the account. */
 account.post("/push/test", async (c) => {
-  const g = await requireUser(c);
+  const g = await requireWriter(c);
   if (!g.ok) return g.res;
   const keys = vapidKeys(c.env);
   if (!keys) return fail(c, 503, { error: "unavailable", message: "Push notifications aren't switched on yet." });

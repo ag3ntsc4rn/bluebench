@@ -255,6 +255,17 @@ describe("account settings and deletion", () => {
   });
 });
 
+describe("account writes", () => {
+  it("are throttled per account (D1 has a daily write budget)", async () => {
+    const svc = mockServices();
+    const { cookie } = await signIn(svc.mails);
+    const statuses: number[] = [];
+    for (let i = 0; i < 31; i++) statuses.push((await call("PATCH", "/api/account", { body: { emailAlerts: i % 2 === 0 }, cookie })).status);
+    expect(statuses.slice(0, 30).every((s) => s === 200)).toBe(true);
+    expect(statuses[30]).toBe(429);
+  });
+});
+
 describe("signed-in checks", () => {
   it("skip the bot check and count against the account's own cap", async () => {
     const svc = mockServices(goodDomain("signed-in.example"));
