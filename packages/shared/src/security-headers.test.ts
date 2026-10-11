@@ -14,6 +14,14 @@ describe("SECURITY_HEADERS", () => {
   it("does not allow inline or eval scripts", () => {
     expect(SECURITY_HEADERS["Content-Security-Policy"]).not.toMatch(/unsafe-(inline|eval)/);
   });
+
+  it("allows Turnstile's script and frame, and nothing else third-party", () => {
+    const csp = SECURITY_HEADERS["Content-Security-Policy"]!;
+    expect(csp).toContain("script-src 'self' https://challenges.cloudflare.com;");
+    expect(csp).toContain("frame-src https://challenges.cloudflare.com;");
+    const origins = csp.match(/https:\/\/[^\s;]+/g) ?? [];
+    expect(new Set(origins)).toEqual(new Set(["https://challenges.cloudflare.com"]));
+  });
 });
 
 describe("formatHeadersFile", () => {
