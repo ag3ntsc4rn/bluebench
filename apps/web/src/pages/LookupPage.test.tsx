@@ -17,7 +17,7 @@ describe("LookupPage", () => {
   it("shows no tool for empty input", () => {
     const html = render("");
     expect(html).not.toContain("Detected:");
-    expect(html).toContain("Nothing you paste is sent or stored.");
+    expect(html).toContain("Nothing is sent unless you choose Check reputation, and nothing is stored.");
   });
 
   it("says when it can't recognise input", () => {
