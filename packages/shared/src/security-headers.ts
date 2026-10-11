@@ -3,15 +3,20 @@
  * and for static assets (emitted as a `_headers` file at build time).
  * Keep this the single source of truth.
  */
+
+/** Cloudflare Turnstile: its script and challenge iframe load from here, only when a lookup needs a challenge. */
+export const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
+
 export const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
-  "script-src 'self'",
+  `script-src 'self' ${TURNSTILE_ORIGIN}`,
   "style-src 'self'",
   "img-src 'self' data:",
   "font-src 'self'",
   "connect-src 'self'",
   "manifest-src 'self'",
   "worker-src 'self'",
+  `frame-src ${TURNSTILE_ORIGIN}`,
   "object-src 'none'",
   "base-uri 'none'",
   "form-action 'self'",
