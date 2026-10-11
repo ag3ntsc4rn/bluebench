@@ -22,9 +22,10 @@ export default defineConfig({
     tailwindcss(),
     securityHeaders(),
     VitePWA({
-      registerType: "autoUpdate",
-      // External registerSW.js rather than an inline script, so the CSP needs no 'unsafe-inline'.
-      injectRegister: "script",
+      // We register from src/pwa.ts (bundled, so no inline script for the CSP) and decide when to
+      // activate a new version ourselves, so an update never wipes a half-finished paste.
+      registerType: "prompt",
+      injectRegister: false,
       includeAssets: ["favicon.svg", "apple-touch-icon.png", "fonts/*.woff2"],
       manifest: {
         name: "Bluebench",

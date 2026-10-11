@@ -26,6 +26,7 @@ packages/shared   types, indicator detection, validation (zod), used by both
 - Shared package imports use explicit `.ts` extensions, because Vite 8 loads its config through Node's native TS support.
 - `packages/shared` holds pure, runtime-neutral code (detection, refanging, IP classification, domain helpers, base64/text). Its tsconfig adds the `DOM` lib only for web-standard globals (`URL`, `TextDecoder`, `atob`) that browsers, Workers and Node all provide. Browser-only analysers (JWT, URL, email headers) live in `apps/web/src/lib`.
 - Tool UI must not use React `style` props: CSP `style-src 'self'` blocks inline style attributes.
+- PWA updates: `registerType: "prompt"`, registered by `apps/web/src/pwa.ts` with the plain Service Worker API (no workbox-window). It checks for a new version whenever the page becomes visible; it reloads straight away if the paste box is empty, otherwise it shows a Reload bar.
 - pnpm 12: only deps listed under `allowBuilds` in `pnpm-workspace.yaml` may run install scripts.
 
 - Database: Cloudflare D1 via Drizzle ORM (users, domains, alert history, daily counters)
