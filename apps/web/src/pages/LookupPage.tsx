@@ -97,7 +97,7 @@ export function LookupPage({ initialValue = "" }: { initialValue?: string }) {
         <p className="mt-2 text-sm text-muted">
           {atLimit
             ? "Limit reached: only the first 64 KB is analysed."
-            : "Runs in your browser. Nothing you paste is sent or stored."}
+            : "Runs in your browser. Nothing is sent unless you choose Check reputation, and nothing is stored."}
         </p>
         <div className="mt-3 flex gap-2">
           <button

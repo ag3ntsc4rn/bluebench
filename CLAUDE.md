@@ -28,6 +28,17 @@ packages/shared   types, indicator detection, validation (zod), used by both
 - Tool UI must not use React `style` props: CSP `style-src 'self'` blocks inline style attributes.
 - PWA updates: `registerType: "prompt"`, registered by `apps/web/src/pwa.ts` with the plain Service Worker API (no workbox-window). It checks for a new version whenever the page becomes visible; it reloads straight away if the paste box is empty, otherwise it shows a Reload bar.
 - pnpm 12: only deps listed under `allowBuilds` in `pnpm-workspace.yaml` may run install scripts.
+- The Worker entry module (`apps/api/src/index.ts`) may export only handlers and Durable Object classes; workerd refuses to start otherwise. A test enforces this.
+- Lookup API (M3):
+  - Lookups are opt-in: the browser sends nothing until the user presses **Check reputation**.
+  - `POST /api/lookup` without a valid session cookie gets a 401 `challenge` carrying the Turnstile site key (the `TURNSTILE_SITE_KEY` wrangler var). The page then runs Turnstile, calls `POST /api/session` and retries once. The session is a 24 h `__Host-bb_session` cookie, HMAC-signed.
+  - Daily caps are counted in the `UsageCounter` Durable Object, not D1, keyed by HMACs of the session id and IP group. D1/Drizzle arrives with accounts in M5.
+  - `ProviderQuota` (one per source) only grants permits; the Worker makes the upstream call. Identical concurrent lookups are coalesced per isolate.
+  - KV holds one entry per indicator (all sources). Cached text has the indicator replaced by a placeholder. abuse.ch answers are fresh for 6 h and may be served stale up to 24 h only when the live call can't be made. Safe Browsing matches are cached exactly for `cacheDuration` and never served stale; Safe Browsing non-matches have no cache duration, so they aren't cached.
+  - The merged verdict is `listed` / `not-listed` / `incomplete`, never "clean".
+  - A missing secret switches a source (or lookups) off with a plain message; it never crashes.
+  - `apps/api/src/safe-fetch.ts` is the SSRF guard for M4's user-supplied hosts.
+- API tests mock upstreams with `vi.spyOn(globalThis, "fetch")` (see `apps/api/test/upstream.ts`); the vitest plugin has no `fetchMock`.
 
 - Database: Cloudflare D1 via Drizzle ORM (users, domains, alert history, daily counters)
 - Cache: Workers KV for lookup verdicts, TTL 6–24 h (Safe Browsing: obey its cache duration exactly)
@@ -107,7 +118,7 @@ Out of scope for v1: CVE feed, one-time secrets, incident runbook, phishing quiz
 
 1. ✅ **Scaffold & deploy** — monorepo, web + api skeletons, shared package, Vitest, GitHub Actions deploy, "hello" page live on bluebench.dev
 2. ✅ **Browser-only tools** — paste box with detection, decoders, email header analyzer
-3. **Lookup API** — abuse.ch + Safe Browsing, KV cache, provider Durable Objects, Turnstile, rate limits, SSRF guard
+3. ✅ **Lookup API** — abuse.ch + Safe Browsing, KV cache, provider Durable Objects, Turnstile, rate limits, SSRF guard
 4. **Domain report card** — DNS checks, headers, crt.sh cert expiry
 5. **Accounts & monitoring** — Better Auth magic link, saved domains, TXT verification, daily cron, push + email alerts
 6. **Finish v1** — lookalike watcher, BYO keys, About page, donate links

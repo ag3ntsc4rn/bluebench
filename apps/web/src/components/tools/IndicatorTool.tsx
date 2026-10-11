@@ -1,16 +1,9 @@
-import { classifyIp, KIND_LABELS, parseIp, type Detection } from "@bluebench/shared";
+import { classifyIp, isLookupKind, KIND_LABELS, parseIp, type Detection } from "@bluebench/shared";
 import type { ReactNode } from "react";
 import { Badge, CopyButton, Facts, Panel } from "../ui";
+import { Reputation } from "./Reputation";
 
-export function LookupComingSoon() {
-  return (
-    <p className="text-sm text-muted">
-      Reputation lookups arrive in a later update. Nothing has been sent anywhere: this ran in your browser.
-    </p>
-  );
-}
-
-/** IPs, domains, hashes and email addresses: show the normalized value until reputation lookups exist. */
+/** IPs, domains, hashes and email addresses: the normalized value, plus an opt-in reputation check. */
 export function IndicatorTool({ detection }: { detection: Detection }) {
   const { kind, value } = detection;
   const ip = kind === "ipv4" || kind === "ipv6" ? parseIp(value) : null;
@@ -40,7 +33,10 @@ export function IndicatorTool({ detection }: { detection: Detection }) {
           This is a special-purpose address, not a host on the public internet. Reputation services won't know it.
         </p>
       )}
-      <LookupComingSoon />
+      {isLookupKind(kind) && (!ipClass || ipClass.global) && <Reputation kind={kind} value={value} />}
+      {kind === "email" && (
+        <p className="text-sm text-muted">To check reputation, paste just the domain after the @.</p>
+      )}
     </Panel>
   );
 }

@@ -27,10 +27,25 @@ pnpm typecheck
 pnpm build       # build the web app
 ```
 
+For lookups in `wrangler dev`, copy `apps/api/.dev.vars.example` to `apps/api/.dev.vars`. It uses Cloudflare's always-pass Turnstile test keys; add real abuse.ch / Safe Browsing keys there to try live lookups.
+
 Security headers live in `packages/shared/src/security-headers.ts`. The API applies them with middleware, and the web build emits them as a `_headers` file for static assets.
 
 ## Deploy
 
 Every push to `main` runs the tests and then `wrangler deploy` via GitHub Actions (`.github/workflows/ci.yml`). This needs the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets.
+
+### Lookup API setup (owner, one-time)
+
+Lookups stay switched off (the API says so politely) until these are set:
+
+1. **Turnstile:** in the Cloudflare dashboard, add a Turnstile widget for `bluebench.dev` in **Invisible** mode. Put its site key in `apps/api/wrangler.jsonc` → `vars.TURNSTILE_SITE_KEY` (it's public). Set the secret key with `wrangler secret put TURNSTILE_SECRET_KEY`.
+2. **Session signing:** `openssl rand -base64 32 | wrangler secret put SESSION_SECRET`.
+3. **abuse.ch:** get a free Auth-Key at <https://auth.abuse.ch/> → `wrangler secret put ABUSECH_AUTH_KEY` (used for URLhaus, ThreatFox and MalwareBazaar).
+4. **Google Safe Browsing:** enable the Safe Browsing API in a Google Cloud project and create an API key restricted to it → `wrangler secret put SAFE_BROWSING_API_KEY`.
+5. **KV:** the `VERDICTS` namespace has no id in `wrangler.jsonc`, so Wrangler creates it on the first deploy. The `CLOUDFLARE_API_TOKEN` used by CI needs **Workers KV Storage: Edit** for that.
+6. **Edge rate limit:** in the dashboard, go to Security → WAF → Rate limiting rules and add a rule for `URI Path starts with /api/`: more than 60 requests per minute from one IP → Block for 1 minute. This stops floods before they reach the Worker's request quota.
+
+Each source can be switched on independently; a missing key shows that source as "not switched on".
 
 IBM Plex fonts are © IBM Corp., licensed under the SIL Open Font License (`apps/web/public/fonts/OFL.txt`).
