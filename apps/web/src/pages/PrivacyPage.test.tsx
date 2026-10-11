@@ -15,6 +15,13 @@ describe("PrivacyPage", () => {
     expect(html).toContain(`mailto:${PRIVACY_CONTACT}`);
   });
 
+  it("explains what a domain check contacts and stores", () => {
+    expect(html).toContain("Check domain");
+    expect(html).toContain("https://www.sectigo.com/privacy-policy");
+    expect(html).toContain("never scans ports");
+    expect(html).toContain("Domain reports");
+  });
+
   it("names the one cookie we set", () => {
     expect(html).toContain("__Host-bb_session");
   });

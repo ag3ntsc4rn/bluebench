@@ -1,7 +1,7 @@
 import { detect } from "@bluebench/shared";
 import { describe, expect, it } from "vitest";
 import { decodeJwt } from "./lib/jwt";
-import { HOME, pageForPath, PRIVACY, TOOLS } from "./routes";
+import { DOMAINS, HOME, pageForPath, PRIVACY, TOOLS } from "./routes";
 
 const EXPECTED_KIND = {
   "ioc-lookup": "url",
@@ -21,7 +21,7 @@ describe("routes", () => {
   });
 
   it("every page has a unique path and title, and a search-friendly description", () => {
-    const pages = [HOME, PRIVACY, ...TOOLS];
+    const pages = [HOME, PRIVACY, DOMAINS, ...TOOLS];
     expect(new Set(pages.map((p) => p.path)).size).toBe(pages.length);
     expect(new Set(pages.map((p) => p.title)).size).toBe(pages.length);
     for (const p of pages) {
@@ -35,6 +35,7 @@ describe("routes", () => {
     expect(pageForPath("/")).toEqual({ kind: "home" });
     expect(pageForPath("/privacy/")).toEqual({ kind: "privacy" });
     expect(pageForPath("/jwt-decoder")).toMatchObject({ kind: "tool", tool: { slug: "jwt-decoder" } });
+    expect(pageForPath("/domain-checker")).toEqual({ kind: "domains" });
     expect(pageForPath("/wp-admin")).toEqual({ kind: "notfound" });
   });
 });

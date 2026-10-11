@@ -34,8 +34,11 @@ export function PrivacyPage() {
         <ul className="list-disc space-y-1 pl-5">
           <li>No accounts needed, no ads, no analytics, no tracking scripts.</li>
           <li>Nothing you paste is logged.</li>
-          <li>Most tools run entirely in your browser. Something leaves your device only when you press Check reputation.</li>
-          <li>We set one cookie, and only after you ask for a reputation lookup.</li>
+          <li>
+            Most tools run entirely in your browser. Something leaves your device only when you press Check reputation or
+            Check domain.
+          </li>
+          <li>We set one cookie, and only after you ask for a reputation lookup or a domain check.</li>
         </ul>
       </Section>
 
@@ -62,6 +65,24 @@ export function PrivacyPage() {
         <p>Those services receive the indicator from our server, not from your browser, and don't receive your IP address from us.</p>
       </Section>
 
+      <Section title="Domain checks">
+        <p>
+          When you press <strong>Check domain</strong>, your browser sends that domain name to our server. The server then:
+        </p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>reads the domain's public DNS records through Cloudflare's 1.1.1.1 resolver;</li>
+          <li>
+            requests the site's home page over HTTPS and over plain HTTP, following at most 3 redirects and identifying
+            itself as Bluebench. The site sees requests from Cloudflare's network, not from you;
+          </li>
+          <li>
+            looks up the domain's certificates on crt.sh, run by Sectigo (
+            <Ext href="https://www.sectigo.com/privacy-policy">Sectigo's privacy policy</Ext>).
+          </li>
+        </ul>
+        <p>It never scans ports or crawls beyond the home page.</p>
+      </Section>
+
       <Section title="What we store, and for how long">
         <ul className="list-disc space-y-2 pl-5">
           <li>
@@ -70,7 +91,11 @@ export function PrivacyPage() {
             indicator itself is removed from the stored result.
           </li>
           <li>
-            <strong>Daily lookup counters</strong>, for fair-use limits: a count per session and per network address, stored
+            <strong>Domain reports</strong>: kept for an hour, and certificate results for a day, so repeat checks don't hit
+            the site or crt.sh again. They're filed under a one-way hash, and the domain name is removed from what's stored.
+          </li>
+          <li>
+            <strong>Daily counters</strong> for lookups and domain checks, for fair-use limits: a count per session and per network address, stored
             only as keyed one-way hashes and deleted after the day ends (UTC).
           </li>
           <li>
@@ -97,7 +122,8 @@ export function PrivacyPage() {
       <Section title="Cookies and local storage">
         <p>
           After the bot check we set one cookie, <code className="font-mono text-sm">__Host-bb_session</code>: a random,
-          signed session ID that expires after 24 hours. It's needed for lookups to work and isn't used for anything else.
+          signed session ID that expires after 24 hours. It's needed for lookups and domain checks to work and isn't used
+          for anything else.
           The app also caches its own files on your device so it works offline and can be installed.
         </p>
       </Section>

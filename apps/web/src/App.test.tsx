@@ -42,4 +42,11 @@ describe("App", () => {
     expect(html).toContain("Page not found");
     expect(html).not.toContain('aria-current="page"');
   });
+
+  it("gives the Domains tab its own page at /domain-checker", () => {
+    const html = renderToString(<App initialPath="/domain-checker" />);
+    expect(html).toContain(">Domain security checker</h1>");
+    expect(html).toMatch(/aria-current="page"[^>]*>.*?<span>Domains<\/span>/);
+    expect(renderToString(<App />)).toContain('href="/domain-checker"'); // footer link
+  });
 });

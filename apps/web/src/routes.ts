@@ -175,6 +175,39 @@ export const HOME: PageMeta = {
     "Free, open-source security toolkit for defenders. Check IPs, domains, URLs and hashes, decode JWTs and base64, analyze email headers. Nothing you paste is logged.",
 };
 
+export interface ContentPage extends PageMeta {
+  name: string;
+  h1: string;
+  lead: string;
+  sections: ToolSection[];
+}
+
+/** The Domains tab, at its own URL so it can be found and shared. */
+export const DOMAINS: ContentPage = {
+  path: "/domain-checker",
+  name: "Domain checker",
+  title: "Domain security checker: SPF, DMARC, DKIM, DNSSEC and HTTPS grade | Bluebench",
+  description:
+    "Free report card for a domain's email and web security: SPF, DMARC, DKIM, DNSSEC, HTTPS, HSTS, security headers and certificate expiry, each with a fix.",
+  h1: "Domain security checker",
+  lead: "Get a letter grade for a domain's email and web security, with a one-line fix for every problem.",
+  sections: [
+    {
+      heading: "What it checks",
+      paragraphs: [
+        "Email: whether SPF, DMARC and DKIM stop others sending mail as you, including SPF's 10-lookup limit, the DMARC policy that actually applies, and weak DKIM keys. DNS: whether the domain is signed with DNSSEC.",
+        "Web: whether the site loads over HTTPS and redirects plain HTTP, sends HSTS and the recommended security headers, and when its newest certificate in public Certificate Transparency logs expires.",
+      ],
+    },
+    {
+      heading: "How it works",
+      paragraphs: [
+        "Bluebench reads the domain's public DNS through Cloudflare's 1.1.1.1, requests the site's home page over HTTPS and plain HTTP (following at most 3 redirects, identifying itself as Bluebench), and looks up certificates on crt.sh. It never scans ports or crawls beyond the home page. Reports are cached for an hour.",
+      ],
+    },
+  ],
+};
+
 export const PRIVACY: PageMeta = {
   path: "/privacy",
   title: "Privacy | Bluebench",
@@ -187,12 +220,18 @@ export const NOT_FOUND: PageMeta = {
   description: "This page doesn't exist.",
 };
 
-export type Page = { kind: "home" } | { kind: "privacy" } | { kind: "tool"; tool: ToolRoute } | { kind: "notfound" };
+export type Page =
+  | { kind: "home" }
+  | { kind: "privacy" }
+  | { kind: "domains" }
+  | { kind: "tool"; tool: ToolRoute }
+  | { kind: "notfound" };
 
 export function pageForPath(path: string): Page {
   const p = path.replace(/\/+$/, "") || "/";
   if (p === "/") return { kind: "home" };
   if (p === PRIVACY.path) return { kind: "privacy" };
+  if (p === DOMAINS.path) return { kind: "domains" };
   const tool = TOOLS.find((t) => t.path === p);
   return tool ? { kind: "tool", tool } : { kind: "notfound" };
 }
@@ -203,6 +242,8 @@ export function metaFor(page: Page): PageMeta {
       return HOME;
     case "privacy":
       return PRIVACY;
+    case "domains":
+      return DOMAINS;
     case "tool":
       return page.tool;
     case "notfound":

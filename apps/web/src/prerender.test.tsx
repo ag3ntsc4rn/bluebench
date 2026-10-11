@@ -12,7 +12,7 @@ const byFile = Object.fromEntries(pages.map((p) => [p.file, p.html]));
 describe("prerender", () => {
   it("writes one file per route plus a 404 page", () => {
     expect(Object.keys(byFile).sort()).toEqual(
-      ["index.html", "privacy.html", "404.html", ...TOOLS.map((t) => `${t.slug}.html`)].sort(),
+      ["index.html", "privacy.html", "domain-checker.html", "404.html", ...TOOLS.map((t) => `${t.slug}.html`)].sort(),
     );
   });
 
