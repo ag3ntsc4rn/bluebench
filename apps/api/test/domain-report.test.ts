@@ -300,8 +300,16 @@ describe("POST /api/domain", () => {
     const statuses: number[] = [];
     for (let i = 0; i < 6; i++) {
       const check = await session(); // different sessions and IPs: the limit is per target
-      await env.VERDICTS.delete(key); // force a fresh run each time
-      statuses.push((await check(d)).status);
+      const status = (await check(d)).status;
+      statuses.push(status);
+      if (status === 200) {
+        // The cache write happens after the response (waitUntil). Wait for it, then remove it so the
+        // next request is a fresh run that has to pass the per-target limit.
+        await vi.waitFor(async () => {
+          if (!(await env.VERDICTS.get(key))) throw new Error("not cached yet");
+        });
+        await env.VERDICTS.delete(key);
+      }
     }
     expect(statuses.slice(0, 5)).toEqual([200, 200, 200, 200, 200]);
     expect(statuses[5]).toBe(429);
