@@ -17,8 +17,9 @@
     "run_worker_first": ["/api/*"]
   },
   // Cached lookup verdicts only (free tier: 1,000 writes/day), never counters.
-  // No id: Wrangler provisions the namespace on first deploy and remembers it.
-  "kv_namespaces": [{ "binding": "VERDICTS" }],
+  // "bluebench-verdicts", created by Wrangler's auto-provisioning on the first M3 deploy. Pinned so a
+  // failed deploy can't make Wrangler try to create it again (it then fails on the duplicate name).
+  "kv_namespaces": [{ "binding": "VERDICTS", "id": "6accf125a6524e5f9aa9882a44a055a8" }],
   "durable_objects": {
     "bindings": [
       // One instance per upstream provider: token bucket + daily budget.
