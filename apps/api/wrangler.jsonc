@@ -34,7 +34,9 @@
   // Per-minute limits, per session token and per IP (IPv6 grouped by /64).
   "ratelimits": [
     { "name": "TOKEN_LIMITER", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } },
-    { "name": "IP_LIMITER", "namespace_id": "1002", "simple": { "limit": 30, "period": 60 } }
+    { "name": "IP_LIMITER", "namespace_id": "1002", "simple": { "limit": 30, "period": 60 } },
+    // Fresh domain reports per target domain: protects third-party sites from being hammered via us.
+    { "name": "TARGET_LIMITER", "namespace_id": "1003", "simple": { "limit": 5, "period": 60 } }
   ],
   "vars": {
     // Public Turnstile site key (invisible widget for bluebench.dev). Empty = lookups switched off.

@@ -1,17 +1,22 @@
 import { Hono, type Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import {
+  canonicalDomain,
   canonicalIndicator,
+  DomainRequestSchema,
+  sha256Hex,
   ipRateKey,
   LookupRequestSchema,
   MAX_PASTE_LENGTH,
   SECURITY_HEADERS,
   SessionRequestSchema,
   type ApiError,
+  type DomainReport,
   type HealthResponse,
   type LookupResponse,
 } from "@bluebench/shared";
 import type { Env } from "./env.ts";
+import { domainReport, hasCachedReport } from "./domain/report.ts";
 import { lookup } from "./lookup.ts";
 import { ANON_DAILY_LIMIT } from "./quota.ts";
 import { hmac, SESSION_COOKIE, SESSION_TTL_SECONDS, signSession, verifySession, verifyTurnstile } from "./session.ts";
@@ -99,13 +104,16 @@ app.post("/session", async (c) => {
   return c.json({ ok: true });
 });
 
-app.post("/lookup", async (c) => {
+type Admitted = { ok: true; sessionId: string; ipKey: string; secret: string } | { ok: false; res: Response };
+
+/** Gate for anything that costs upstream calls: configured, a valid session, and within per-minute limits. */
+async function admit(c: Ctx): Promise<Admitted> {
   const { TURNSTILE_SITE_KEY, SESSION_SECRET } = c.env;
-  if (!TURNSTILE_SITE_KEY || !SESSION_SECRET) return notConfigured(c);
+  if (!TURNSTILE_SITE_KEY || !SESSION_SECRET) return { ok: false, res: notConfigured(c) };
 
   // No token, no lookups.
   const session = await verifySession(SESSION_SECRET, getCookie(c, SESSION_COOKIE, "host"));
-  if (!session) return challenge(c);
+  if (!session) return { ok: false, res: challenge(c) };
 
   const ipKey = clientIp(c);
   const [byToken, byIp] = await Promise.all([
@@ -113,8 +121,29 @@ app.post("/lookup", async (c) => {
     c.env.IP_LIMITER.limit({ key: `lookup:${ipKey}` }),
   ]);
   if (!byToken.success || !byIp.success) {
-    return fail(c, 429, { error: "rate-limited", message: "That's a lot of lookups in a minute. Wait a moment and try again.", retryAfter: 60 });
+    return {
+      ok: false,
+      res: fail(c, 429, { error: "rate-limited", message: "That's a lot of checks in a minute. Wait a moment and try again.", retryAfter: 60 }),
+    };
   }
+  return { ok: true, sessionId: session.id, ipKey, secret: SESSION_SECRET };
+}
+
+/** Count one lookup or domain check against today's caps. Counters are keyed by HMACs, so no session ids or IPs are stored. */
+async function chargeDaily(c: Ctx, a: Extract<Admitted, { ok: true }>): Promise<Response | null> {
+  const keys = await Promise.all([hmac(a.secret, `s:${a.sessionId}`), hmac(a.secret, `ip:${a.ipKey}`)]);
+  const usage = c.env.USAGE.get(c.env.USAGE.idFromName("daily"));
+  const quota = await usage.consume(keys, ANON_DAILY_LIMIT);
+  if (quota.ok) return null;
+  return fail(c, 429, {
+    error: "daily-limit",
+    message: `You've used today's ${ANON_DAILY_LIMIT} free lookups and checks. They reset at midnight UTC. Signing in and your own API keys are coming soon.`,
+  });
+}
+
+app.post("/lookup", async (c) => {
+  const a = await admit(c);
+  if (!a.ok) return a.res;
 
   const body = await readJson(c);
   if (!body.ok) return body.res;
@@ -124,16 +153,8 @@ app.post("/lookup", async (c) => {
     return fail(c, 400, { error: "invalid", message: "That isn't something we can look up. Public IPs, domains, URLs and file hashes only." });
   }
 
-  // Daily caps: counters are keyed by HMACs, so no session ids or IPs are stored in the clear.
-  const keys = await Promise.all([hmac(SESSION_SECRET, `s:${session.id}`), hmac(SESSION_SECRET, `ip:${ipKey}`)]);
-  const usage = c.env.USAGE.get(c.env.USAGE.idFromName("daily"));
-  const quota = await usage.consume(keys, ANON_DAILY_LIMIT);
-  if (!quota.ok) {
-    return fail(c, 429, {
-      error: "daily-limit",
-      message: `You've used today's ${ANON_DAILY_LIMIT} free lookups. They reset at midnight UTC. Signing in and your own API keys are coming soon.`,
-    });
-  }
+  const overDaily = await chargeDaily(c, a);
+  if (overDaily) return overDaily;
 
   const result = await lookup(parsed.data.kind, value, {
     env: c.env,
@@ -141,6 +162,36 @@ app.post("/lookup", async (c) => {
     waitUntil: (p) => c.executionCtx.waitUntil(p),
   });
   return c.json<LookupResponse>(result);
+});
+
+/** Domain report card: DNS, email authentication, HTTPS, headers and certificate checks. */
+app.post("/domain", async (c) => {
+  const a = await admit(c);
+  if (!a.ok) return a.res;
+
+  const body = await readJson(c);
+  if (!body.ok) return body.res;
+  const parsed = DomainRequestSchema.safeParse(body.data);
+  const domain = parsed.success ? canonicalDomain(parsed.data.domain) : null;
+  if (!domain) return fail(c, 400, { error: "invalid", message: "Enter a domain name, like example.com." });
+
+  // Cap fresh checks per target, so nobody can use Bluebench to hammer someone else's site.
+  if (!(await hasCachedReport(c.env, domain))) {
+    const byTarget = await c.env.TARGET_LIMITER.limit({ key: await sha256Hex(domain) });
+    if (!byTarget.success) {
+      return fail(c, 429, {
+        error: "rate-limited",
+        message: "This domain has been checked a lot in the last minute. Try again shortly.",
+        retryAfter: 60,
+      });
+    }
+  }
+
+  const overDaily = await chargeDaily(c, a);
+  if (overDaily) return overDaily;
+
+  const report = await domainReport(domain, { env: c.env, tier: "anon", waitUntil: (p) => c.executionCtx.waitUntil(p) });
+  return c.json<DomainReport>(report);
 });
 
 app.notFound((c) => c.json({ ok: false, error: "Not found" }, 404));

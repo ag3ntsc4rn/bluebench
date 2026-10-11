@@ -11,6 +11,7 @@ import {
 import type { Env } from "./env.ts";
 import { PROVIDERS, type ProviderAnswer } from "./providers.ts";
 import type { QuotaDenial, Tier } from "./quota.ts";
+import { redact, restore } from "./redact.ts";
 
 const HOUR = 3600_000;
 /** abuse.ch answers are fresh for 6 h, and may be served stale for up to 24 h when the live budget is spent. */
@@ -27,19 +28,6 @@ interface CachedSource {
   staleUntil: number;
 }
 type CacheEntry = Partial<Record<SourceId, CachedSource>>;
-
-/**
- * The indicator itself is never stored in KV: occurrences in cached text are replaced by a
- * placeholder and restored on read (the key is already a hash).
- */
-const PLACEHOLDER = "⟦indicator⟧";
-/** Swap `from` for `to` inside the JSON text, matching the JSON-escaped forms. */
-function swapJson(r: SourceResult, from: string, to: string): SourceResult {
-  const esc = (s: string) => JSON.stringify(s).slice(1, -1);
-  return JSON.parse(JSON.stringify(r).split(esc(from)).join(esc(to)));
-}
-const redact = (r: SourceResult, value: string) => swapJson(r, value, PLACEHOLDER);
-const restore = (r: SourceResult, value: string) => swapJson(r, PLACEHOLDER, value);
 
 const SKIP_REASONS: Record<QuotaDenial | "unconfigured", string> = {
   unconfigured: "Not switched on for this server yet.",

@@ -10,6 +10,8 @@ export interface Env {
   USAGE: DurableObjectNamespace<UsageCounter>;
   TOKEN_LIMITER: RateLimit;
   IP_LIMITER: RateLimit;
+  /** Fresh domain reports per target domain (keyed by its hash), so we can't be used to hammer a site. */
+  TARGET_LIMITER: RateLimit;
 
   /** Public Turnstile site key (wrangler var). Empty until the owner creates the widget. */
   TURNSTILE_SITE_KEY: string;
