@@ -52,4 +52,22 @@ Lookups stay switched off (the API says so politely) until these are set:
 
 Each source can be switched on independently; a missing key shows that source as "not switched on".
 
+### Accounts and monitoring setup (owner, one-time)
+
+Sign-in, saved domains and alerts stay switched off (the site says so) until these are done:
+
+1. **D1 database:** `wrangler d1 create bluebench`, then paste the printed `database_id` into `apps/api/wrangler.jsonc` (replacing the zeros). CI applies `apps/api/migrations` before each deploy, so the `CLOUDFLARE_API_TOKEN` needs **D1: Edit** as well as its Workers permissions.
+2. **Better Auth secret:** `openssl rand -base64 32 | wrangler secret put BETTER_AUTH_SECRET`.
+3. **Resend (email):** create a free account, add and verify the `bluebench.dev` domain (Resend shows the DNS records: DKIM plus a `send` subdomain for bounces, which doesn't clash with Email Routing), keep open and click tracking **off**, then create a sending-only API key → `wrangler secret put RESEND_API_KEY`. Mail comes from `EMAIL_FROM` in `wrangler.jsonc`.
+4. **Web Push (VAPID keys):** generate a pair once:
+
+   ```sh
+   node -e 'const c=require("crypto");const k=c.generateKeyPairSync("ec",{namedCurve:"P-256"}).privateKey.export({format:"jwk"});console.log("public ",Buffer.concat([Buffer.from([4]),Buffer.from(k.x,"base64url"),Buffer.from(k.y,"base64url")]).toString("base64url"));console.log("private",k.d)'
+   ```
+
+   Put the public key in `VAPID_PUBLIC_KEY` in `wrangler.jsonc` and the private one in `wrangler secret put VAPID_PRIVATE_KEY`. Without them alerts fall back to email. Don't rotate the pair casually: existing browser subscriptions are tied to it.
+5. **Cron:** nothing to do. The `* * * * *` trigger in `wrangler.jsonc` is created on deploy. Locally, run `wrangler dev --test-scheduled` and open `/__scheduled` to fire one run.
+
+The schema lives in `apps/api/src/db/schema.ts`. After changing it, run `pnpm --filter @bluebench/api db:generate` and commit the new file in `apps/api/migrations`.
+
 IBM Plex fonts are © IBM Corp., licensed under the SIL Open Font License (`apps/web/public/fonts/OFL.txt`).
