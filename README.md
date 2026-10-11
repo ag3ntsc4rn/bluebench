@@ -43,8 +43,9 @@ Lookups stay switched off (the API says so politely) until these are set:
 2. **Session signing:** `openssl rand -base64 32 | wrangler secret put SESSION_SECRET`.
 3. **abuse.ch:** get a free Auth-Key at <https://auth.abuse.ch/> → `wrangler secret put ABUSECH_AUTH_KEY` (used for URLhaus, ThreatFox and MalwareBazaar).
 4. **Google Safe Browsing:** enable the Safe Browsing API in a Google Cloud project and create an API key restricted to it → `wrangler secret put SAFE_BROWSING_API_KEY`.
-5. **KV:** the `VERDICTS` namespace has no id in `wrangler.jsonc`, so Wrangler creates it on the first deploy. The `CLOUDFLARE_API_TOKEN` used by CI needs **Workers KV Storage: Edit** for that.
-6. **Edge rate limit:** in the dashboard, go to Security → WAF → Rate limiting rules and add a rule for `URI Path starts with /api/`: more than 60 requests per minute from one IP → Block for 1 minute. This stops floods before they reach the Worker's request quota.
+5. **KV:** the `VERDICTS` namespace (`bluebench-verdicts`) already exists and its id is pinned in `wrangler.jsonc`.
+6. **workers.dev subdomain:** the account needs one before this Worker will deploy (error 10063), even though `workers_dev` is off and nothing is served there. Open **Workers & Pages** in the dashboard once and it's created automatically.
+7. **Edge rate limit:** in the dashboard, go to Security → WAF → Rate limiting rules and add a rule for `URI Path starts with /api/`: more than 60 requests per minute from one IP → Block for 1 minute. This stops floods before they reach the Worker's request quota.
 
 Each source can be switched on independently; a missing key shows that source as "not switched on".
 
