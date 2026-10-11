@@ -109,7 +109,7 @@ Out of scope for v1: CVE feed, one-time secrets, incident runbook, phishing quiz
 
 - **Anonymous identity:** invisible Turnstile on first lookup → short-lived signed token (HMAC, ~24 h) in an HttpOnly cookie. No token, no lookups.
 - **Rate limits:** Workers rate-limiting binding per token and per IP (IPv6 grouped by /64), e.g. 10/min; daily caps (anon ~100, signed-in higher) counted in D1 or a Durable Object, **not KV**.
-- **Edge:** document a Cloudflare WAF rate-limit rule (e.g. > 60 req/min/IP) for the owner to add in the dashboard.
+- **Edge:** no WAF rate-limit rule. As of 2026-10 it's a paid add-on on this account, and we stay on the free tier. Floods are refused by Turnstile and the in-Worker limits, but still count toward the 100k Worker requests/day. If that runs out, only `/api/*` fails until midnight UTC: pages and browser-only tools are static assets and keep working. If abuse appears, turn on Bot Fight Mode (free) for the zone.
 - **Upstream budget:** each provider's Durable Object enforces its per-minute rate and daily budget; anonymous traffic may spend at most ~60 % of a budget. Coalesce concurrent lookups of the same indicator.
 - **Degrade gracefully:** budget exhausted → serve stale cache if allowed, list skipped sources, suggest sign-in or BYO key. Never a bare error.
 - **SSRF:** any server-side fetch to a user-supplied host must resolve DNS first and reject private, loopback, link-local, CGNAT, multicast and cloud-metadata ranges (v4 and v6); allow only ports 80/443; follow at most 3 redirects, re-checking each hop; time out at 5 s.
