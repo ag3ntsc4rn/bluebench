@@ -18,7 +18,7 @@ import {
 } from "@bluebench/shared";
 import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import { accountsEnabled, CODE_ATTEMPTS, currentUser, db, getAuth, MailFailed, type AccountUser } from "./auth.ts";
-import { alert, domain, pushSubscription, user, verification } from "./db/schema.ts";
+import { alert, domain, lookalike, pushSubscription, user, verification } from "./db/schema.ts";
 import { Budget, Resolver } from "./dns.ts";
 import type { Env } from "./env.ts";
 import { admit, clientIp, fail, readJson, tooFast, type Ctx } from "./http.ts";
@@ -80,7 +80,7 @@ function forwardCookies(c: Ctx, res: Response) {
 
 const iso = (d: Date | null) => (d ? d.toISOString() : null);
 
-function toSavedDomain(row: typeof domain.$inferSelect): SavedDomain {
+function toSavedDomain(row: typeof domain.$inferSelect, hits: (typeof lookalike.$inferSelect)[] = []): SavedDomain {
   return {
     id: row.id,
     domain: row.name,
@@ -90,6 +90,11 @@ function toSavedDomain(row: typeof domain.$inferSelect): SavedDomain {
     score: row.score,
     lastCheckedAt: iso(row.lastCheckedAt),
     certExpiresAt: iso(row.certExpiresAt),
+    lookalikes: hits
+      .filter((h) => h.domainId === row.id)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((h) => ({ domain: h.name, web: h.web, mail: h.mail, firstSeenAt: h.firstSeenAt.toISOString() })),
+    lookalikesScannedAt: iso(row.lookalikeScannedAt),
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -206,8 +211,10 @@ account.delete("/account", async (c) => {
 account.get("/domains", async (c) => {
   const g = await requireUser(c);
   if (!g.ok) return g.res;
-  const rows = await db(c.env).select().from(domain).where(eq(domain.userId, g.user.id)).orderBy(asc(domain.createdAt));
-  return c.json<DomainsResponse>({ ok: true, domains: rows.map(toSavedDomain) });
+  const d = db(c.env);
+  const rows = await d.select().from(domain).where(eq(domain.userId, g.user.id)).orderBy(asc(domain.createdAt));
+  const hits = rows.length > 0 ? await d.select().from(lookalike).where(inArray(lookalike.domainId, rows.map((r) => r.id))) : [];
+  return c.json<DomainsResponse>({ ok: true, domains: rows.map((r) => toSavedDomain(r, hits)) });
 });
 
 account.post("/domains", async (c) => {

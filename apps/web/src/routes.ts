@@ -6,6 +6,10 @@
 
 export const SITE_URL = "https://bluebench.dev";
 export const SITE_NAME = "Bluebench";
+/** The public source code. */
+export const SOURCE_URL = "https://github.com/ag3ntsc4rn/bluebench";
+/** Where donations go. Set to null to hide donate links (pages then say donations open soon). */
+export const DONATE_URL: string | null = "https://github.com/sponsors/ag3ntsc4rn";
 
 export type ToolSlug = "ioc-lookup" | "jwt-decoder" | "email-header-analyzer" | "base64-decoder" | "url-decoder";
 
@@ -218,9 +222,23 @@ export const DOMAINS: ContentPage = {
 /** The Alerts tab: domain monitoring, notifications and the account. */
 export const ALERTS: PageMeta = {
   path: "/alerts",
-  title: "Domain monitoring alerts: grade drops and certificate expiry | Bluebench",
+  title: "Domain monitoring: grade drops, certificate expiry, lookalikes | Bluebench",
   description:
-    "Free daily monitoring for up to 5 domains you control: push or email alerts when a security grade drops or a certificate is about to expire.",
+    "Free daily monitoring for up to 5 domains you control: push or email alerts when a security grade drops, a certificate nears expiry or a lookalike domain appears.",
+};
+
+export const ABOUT: PageMeta = {
+  path: "/about",
+  title: "About Bluebench: free, open-source security tools | Bluebench",
+  description:
+    "Why Bluebench exists, what it will never do (ads, tracking, logging what you paste), where its data comes from, and how to support it.",
+};
+
+/** Account, your own API keys and donations. Not indexed: it's personal. */
+export const SETTINGS: PageMeta = {
+  path: "/settings",
+  title: "Settings | Bluebench",
+  description: "Your Bluebench account, the API keys you keep in this browser for VirusTotal, AbuseIPDB, GreyNoise and OTX, and how to support Bluebench.",
 };
 
 /** Where magic links land. Not indexed. */
@@ -245,6 +263,8 @@ export const NOT_FOUND: PageMeta = {
 export type Page =
   | { kind: "home" }
   | { kind: "privacy" }
+  | { kind: "about" }
+  | { kind: "settings" }
   | { kind: "domains" }
   | { kind: "alerts" }
   | { kind: "signin" }
@@ -255,6 +275,8 @@ export function pageForPath(path: string): Page {
   const p = path.replace(/\/+$/, "") || "/";
   if (p === "/") return { kind: "home" };
   if (p === PRIVACY.path) return { kind: "privacy" };
+  if (p === ABOUT.path) return { kind: "about" };
+  if (p === SETTINGS.path) return { kind: "settings" };
   if (p === DOMAINS.path) return { kind: "domains" };
   if (p === ALERTS.path) return { kind: "alerts" };
   if (p === SIGNIN.path) return { kind: "signin" };
@@ -268,6 +290,10 @@ export function metaFor(page: Page): PageMeta {
       return HOME;
     case "privacy":
       return PRIVACY;
+    case "about":
+      return ABOUT;
+    case "settings":
+      return SETTINGS;
     case "domains":
       return DOMAINS;
     case "alerts":

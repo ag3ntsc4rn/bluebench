@@ -1,4 +1,16 @@
-import type { ApiError, DomainReport, LookupKind, LookupResponse } from "@bluebench/shared";
+import {
+  BYO_SOURCES,
+  byoRequest,
+  byoSourcesFor,
+  parseByo,
+  type ApiError,
+  type ByoResponse,
+  type ByoSourceId,
+  type DomainReport,
+  type LookupKind,
+  type LookupResponse,
+  type SourceResult,
+} from "@bluebench/shared";
 
 /** Produces a Turnstile token for a site key (runs the invisible challenge). */
 export type GetTurnstileToken = (siteKey: string) => Promise<string>;
@@ -83,4 +95,43 @@ export function lookupReputation(
 /** Grade a domain's email and web security. */
 export function checkDomain(domain: string, getToken: GetTurnstileToken, fetchImpl: typeof fetch = fetch): Promise<DomainReport | ApiError> {
   return postWithSession<DomainReport>("/api/domain", { domain }, getToken, fetchImpl);
+}
+
+/** Ask a provider straight from the browser (OTX allows cross-site calls). No cookies, no referrer. */
+async function askDirect(source: ByoSourceId, kind: LookupKind, value: string, key: string, fetchImpl: typeof fetch): Promise<SourceResult> {
+  const { url, headers } = byoRequest(source, kind, value, key);
+  try {
+    const res = await fetchImpl(url, { headers, credentials: "omit", referrerPolicy: "no-referrer", signal: AbortSignal.timeout(8000) });
+    const body: unknown = await res.json().catch(() => null);
+    return { source, ...parseByo(source, kind, value, res.status, body), checkedAt: new Date().toISOString() };
+  } catch {
+    return { source, status: "error", summary: `Couldn't reach ${BYO_SOURCES[source].label}. Check your connection and try again.`, facts: [] };
+  }
+}
+
+/**
+ * Look an indicator up with the user's own keys: OTX directly from the browser, the others through
+ * our relay (which needs the session the shared lookup sets up). Every source with a key that can
+ * answer this kind gets a result, even if it's an error.
+ */
+export async function byoLookup(
+  kind: LookupKind,
+  value: string,
+  keys: Partial<Record<ByoSourceId, string>>,
+  getToken: GetTurnstileToken,
+  fetchImpl: typeof fetch = fetch,
+): Promise<SourceResult[]> {
+  const sources = byoSourcesFor(kind, keys);
+  const direct = sources.filter((s) => !BYO_SOURCES[s].relay);
+  const relayed = sources.filter((s) => BYO_SOURCES[s].relay);
+
+  const relayP: Promise<SourceResult[]> =
+    relayed.length === 0
+      ? Promise.resolve([])
+      : postWithSession<ByoResponse>("/api/byo", { kind, value, keys: Object.fromEntries(relayed.map((s) => [s, keys[s]])) }, getToken, fetchImpl).then((res) =>
+          res.ok ? res.sources : relayed.map((source) => ({ source, status: "error" as const, summary: res.message, facts: [] })),
+        );
+  const [d, r] = await Promise.all([Promise.all(direct.map((s) => askDirect(s, kind, value, keys[s]!, fetchImpl))), relayP]);
+  const all = [...d, ...r];
+  return sources.flatMap((s) => all.filter((x) => x.source === s));
 }

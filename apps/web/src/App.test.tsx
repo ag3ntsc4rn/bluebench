@@ -61,4 +61,22 @@ describe("App", () => {
     expect(html).toContain('id="signin-heading"');
     expect(html).not.toContain('aria-current="page"');
   });
+
+  it("serves About and Settings outside the tabs, and links to both from every page", () => {
+    const about = renderToString(<App initialPath="/about" />);
+    expect(about).toContain('id="about-heading"');
+    expect(about).not.toContain('aria-current="page"');
+
+    const settings = renderToString(<App initialPath="/settings" />);
+    expect(settings).toContain('id="settings-heading"');
+    expect(settings).toContain("Your API keys");
+    expect(settings.match(/href="\/settings" aria-label="Settings" aria-current="page"/)).not.toBeNull();
+
+    for (const html of [renderToString(<App />), renderToString(<App initialPath="/domain-checker" />)]) {
+      expect(html).toContain('aria-label="Settings"'); // top bar on mobile
+      expect(html).toMatch(/<a href="\/about"[^>]*>About<\/a>/);
+      expect(html).toContain('href="https://github.com/ag3ntsc4rn/bluebench"');
+      expect(html).toMatch(/<a href="https:\/\/github\.com\/sponsors\/ag3ntsc4rn"[^>]*>Donate<\/a>/);
+    }
+  });
 });

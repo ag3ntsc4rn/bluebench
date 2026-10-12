@@ -15,12 +15,13 @@ describe("SECURITY_HEADERS", () => {
     expect(SECURITY_HEADERS["Content-Security-Policy"]).not.toMatch(/unsafe-(inline|eval)/);
   });
 
-  it("allows Turnstile's script and frame, and nothing else third-party", () => {
+  it("allows Turnstile's script and frame, OTX for bring-your-own-key calls, and nothing else third-party", () => {
     const csp = SECURITY_HEADERS["Content-Security-Policy"]!;
     expect(csp).toContain("script-src 'self' https://challenges.cloudflare.com;");
     expect(csp).toContain("frame-src https://challenges.cloudflare.com;");
+    expect(csp).toContain("connect-src 'self' https://otx.alienvault.com;");
     const origins = csp.match(/https:\/\/[^\s;]+/g) ?? [];
-    expect(new Set(origins)).toEqual(new Set(["https://challenges.cloudflare.com"]));
+    expect(new Set(origins)).toEqual(new Set(["https://challenges.cloudflare.com", "https://otx.alienvault.com"]));
   });
 });
 

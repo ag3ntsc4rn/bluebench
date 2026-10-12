@@ -7,13 +7,16 @@
 /** Cloudflare Turnstile: its script and challenge iframe load from here, only when a lookup needs a challenge. */
 export const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
 
+/** AlienVault OTX: the browser calls it directly with the user's own key (bring-your-own-key lookups). */
+export const OTX_ORIGIN = "https://otx.alienvault.com";
+
 export const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   `script-src 'self' ${TURNSTILE_ORIGIN}`,
   "style-src 'self'",
   "img-src 'self' data:",
   "font-src 'self'",
-  "connect-src 'self'",
+  `connect-src 'self' ${OTX_ORIGIN}`,
   "manifest-src 'self'",
   "worker-src 'self'",
   `frame-src ${TURNSTILE_ORIGIN}`,

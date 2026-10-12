@@ -57,7 +57,8 @@ export function PrivacyPage() {
           </li>
           <li>
             <strong>The domains you save</strong> (up to 5), a random verification code for each, and the latest daily
-            result: the grade, each check's status and the certificate's expiry date.
+            result: the grade, each check's status, the certificate's expiry date, and any lookalike domains found with a
+            website or mail (the name, which of the two it has, and when we first saw it).
           </li>
           <li>
             <strong>Your alerts</strong> (for example "grade dropped from A to C"), kept for 180 days so you can see them on
@@ -74,12 +75,14 @@ export function PrivacyPage() {
           </li>
         </ul>
         <p>
-          This is kept in Cloudflare's D1 database. <strong>Delete account</strong> on the Alerts tab erases all of it
-          straight away.
+          This is kept in Cloudflare's D1 database. <strong>Delete account</strong> in Settings erases all of it straight
+          away.
         </p>
         <p>
           <strong>Daily checks.</strong> Once you prove you control a saved domain (with a DNS TXT record), our server runs
-          the same domain check described below on it once a day, and compares the result with the day before.
+          the same domain check described below on it once a day, and compares the result with the day before. It also
+          looks up about 120 lookalike names (typos, look-alike characters and other endings, such as examp1e.com or
+          example.net) in public DNS through Cloudflare's 1.1.1.1, to see which have a website or mail. It doesn't visit them.
         </p>
         <p>
           <strong>Who helps deliver alerts.</strong> Emails (sign-in links and codes, and alerts when push isn't available) are sent
@@ -111,6 +114,29 @@ export function PrivacyPage() {
           </li>
         </ul>
         <p>Those services receive the indicator from our server, not from your browser, and don't receive your IP address from us.</p>
+      </Section>
+
+      <Section title="Your own API keys (optional)">
+        <p>
+          In Settings you can add your own keys for VirusTotal, AbuseIPDB, GreyNoise and AlienVault OTX. They're stored only
+          in your browser (in its IndexedDB storage), never in our database. Remove them in Settings, or by clearing this
+          site's data. When you press <strong>Check reputation</strong> with keys saved:
+        </p>
+        <ul className="list-disc space-y-2 pl-5">
+          <li>
+            <strong>AlienVault OTX</strong>: your browser sends the indicator and your key straight to OTX, so it sees your IP
+            address. We don't see this request (<Ext href="https://otx.alienvault.com/privacy-policy">OTX's privacy policy</Ext>).
+          </li>
+          <li>
+            <strong>VirusTotal, AbuseIPDB and GreyNoise</strong> don't accept requests from web pages, so your browser sends the
+            indicator and your key to our server, which passes them on and returns the answer. Neither is logged, stored or
+            cached, and the answer isn't shown to anyone else. The provider sees the request coming from Cloudflare's network,
+            not from you (<Ext href="https://www.virustotal.com/gui/privacy-policy">VirusTotal</Ext>,{" "}
+            <Ext href="https://www.abuseipdb.com/legal">AbuseIPDB</Ext> and <Ext href="https://www.greynoise.io/privacy">GreyNoise</Ext>{" "}
+            privacy policies).
+          </li>
+        </ul>
+        <p>Each provider's own terms apply to how you use your key.</p>
       </Section>
 
       <Section title="Domain checks">
@@ -181,6 +207,10 @@ export function PrivacyPage() {
           have one. For 15 minutes after you ask for a sign-in email, it also keeps the address it went to (
           <code className="font-mono text-sm">bb.pendingSignIn</code>), so the code box is still there if your phone
           reloads the app while you check your email.
+        </p>
+        <p>
+          If you add your own API keys, they're kept in an IndexedDB database named{" "}
+          <code className="font-mono text-sm">bluebench</code> in your browser, and nowhere else.
         </p>
         <p>The app also caches its own files on your device so it works offline and can be installed.</p>
       </Section>

@@ -35,6 +35,17 @@ describe("PrivacyPage", () => {
     expect(html).toContain("encrypted for your device");
   });
 
+  it("explains own API keys: kept in the browser, which go direct and which through our server", () => {
+    expect(html).toContain("Your own API keys (optional)");
+    expect(html).toContain("IndexedDB");
+    expect(html).toContain("https://otx.alienvault.com/privacy-policy");
+    expect(html).toContain("passes them on and returns the answer");
+  });
+
+  it("mentions the daily lookalike lookups", () => {
+    expect(html).toContain("lookalike");
+  });
+
   it("never uses inline style attributes (CSP forbids them)", () => {
     expect(html).not.toMatch(/\sstyle="/);
   });

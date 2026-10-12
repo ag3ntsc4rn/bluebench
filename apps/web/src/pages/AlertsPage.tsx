@@ -1,8 +1,9 @@
 import { MAX_SAVED_DOMAINS, type AlertItem, type AlertKind, type ApiError, type Me } from "@bluebench/shared";
 import { useEffect, useState, type ReactNode } from "react";
+import { AppLink } from "../components/AppLink";
 import { SignInForm } from "../components/SignInForm";
 import { Badge, Panel, type Tone } from "../components/ui";
-import { deleteAccount, listAlerts, setEmailAlerts, signOut, useAccount } from "../lib/account";
+import { listAlerts, setEmailAlerts, useAccount } from "../lib/account";
 import { currentSubscription, disablePush, enablePush, pushSupport, sendTestPush, type PushSupport } from "../lib/push";
 
 type SignedIn = Extract<Me, { signedIn: true }>;
@@ -11,6 +12,7 @@ const KIND: Record<AlertKind, { tone: Tone; label: string }> = {
   "grade-drop": { tone: "warn", label: "Grade drop" },
   "cert-expiry": { tone: "warn", label: "Certificate" },
   "verification-lost": { tone: "neutral", label: "Paused" },
+  lookalike: { tone: "warn", label: "Lookalike" },
   test: { tone: "neutral", label: "Test" },
 };
 
@@ -172,57 +174,6 @@ function History() {
   );
 }
 
-function AccountPanel({ me }: { me: SignedIn }) {
-  const [confirming, setConfirming] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const remove = async () => {
-    setBusy(true);
-    await disablePush().catch(() => {});
-    const res = await deleteAccount();
-    setBusy(false);
-    if (!res.ok) setError(res.message);
-  };
-
-  return (
-    <Panel title="Account">
-      <p className="text-sm">
-        Signed in as <span className="font-mono break-all">{me.email}</span>
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => void signOut()} className="min-h-11 rounded-md border border-border px-3 text-sm text-muted hover:text-fg">
-          Sign out
-        </button>
-        {!confirming && (
-          <button type="button" onClick={() => setConfirming(true)} className="min-h-11 rounded-md border border-border px-3 text-sm text-muted hover:text-fg">
-            Delete account
-          </button>
-        )}
-      </div>
-      {confirming && (
-        <div className="space-y-2 rounded-md border border-critical/50 p-3">
-          <p className="text-sm">This deletes your account, saved domains, alert history and push subscriptions straight away. It can't be undone.</p>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void remove()}
-              className="min-h-11 rounded-md border border-critical px-3 text-sm font-medium text-critical disabled:opacity-50"
-            >
-              Yes, delete everything
-            </button>
-            <button type="button" onClick={() => setConfirming(false)} className="min-h-11 rounded-md border border-border px-3 text-sm text-muted hover:text-fg">
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-      {error && <Note label="Error">{error}</Note>}
-    </Panel>
-  );
-}
-
 export function AlertsPage({ heading = "Alerts", lead }: { heading?: string; lead?: string }) {
   const me = useAccount();
   return (
@@ -233,7 +184,7 @@ export function AlertsPage({ heading = "Alerts", lead }: { heading?: string; lea
         </h1>
         <p className="mt-1 text-muted">
           {lead ??
-            `Save up to ${MAX_SAVED_DOMAINS} domains on the Domains tab and verify them; Bluebench re-checks them daily and tells you when a grade drops or a certificate is close to expiring.`}
+            `Save up to ${MAX_SAVED_DOMAINS} domains on the Domains tab and verify them; Bluebench re-checks them daily and tells you when a grade drops, a certificate is close to expiring or a lookalike domain starts resolving.`}
         </p>
       </div>
       {me === null && <p className="text-sm text-muted">Loading…</p>}
@@ -242,7 +193,9 @@ export function AlertsPage({ heading = "Alerts", lead }: { heading?: string; lea
         <>
           <Notifications me={me} />
           <History />
-          <AccountPanel me={me} />
+          <p className="text-sm text-muted">
+            Signed in as <span className="font-mono break-all">{me.email}</span>. <AppLink href="/settings">Sign out or delete your account in Settings</AppLink>.
+          </p>
         </>
       )}
     </section>

@@ -9,6 +9,42 @@ const GRADE_TONE: Record<Grade, Tone> = { A: "ok", B: "ok", C: "warn", D: "warn"
 
 const date = (iso: string) => new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
 
+const USES = (h: SavedDomain["lookalikes"][number]) => [h.web && "website", h.mail && "mail"].filter(Boolean).join(" + ");
+
+/** Lookalike domains that resolve, from the daily watcher. */
+function Lookalikes({ d }: { d: SavedDomain }) {
+  if (!d.lookalikesScannedAt && d.lookalikes.length === 0) {
+    return <p className="text-sm text-muted">The first lookalike scan runs within the day.</p>;
+  }
+  if (d.lookalikes.length === 0) {
+    return <p className="text-sm text-muted">No lookalike domains with a website or mail found. Checked daily.</p>;
+  }
+  const n = d.lookalikes.length;
+  return (
+    <details className="rounded-md border border-border">
+      <summary className="flex min-h-11 cursor-pointer items-center gap-2 px-3 text-sm">
+        <Badge tone="warn">{`${n} lookalike${n === 1 ? "" : "s"}`}</Badge>
+        <span>Domains that look like this one and resolve</span>
+      </summary>
+      <div className="space-y-2 border-t border-border p-3">
+        <ul className="space-y-1">
+          {d.lookalikes.map((h) => (
+            <li key={h.domain} className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
+              <span className="font-mono break-all">{h.domain}</span>
+              <span className="text-muted">
+                {USES(h)} · since {date(h.firstSeenAt)}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <p className="text-sm text-muted">
+          Some may be yours or harmless. Ones you don't recognise could be used for phishing: warn your users, and report abuse to the registrar or host.
+        </p>
+      </div>
+    </details>
+  );
+}
+
 function DomainRow({ d, onChange, onRemoved, onCheck }: { d: SavedDomain; onChange: (d: SavedDomain) => void; onRemoved: () => void; onCheck: () => void }) {
   const [message, setMessage] = useState<{ tone: "ok" | "warn"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -46,6 +82,7 @@ function DomainRow({ d, onChange, onRemoved, onCheck }: { d: SavedDomain; onChan
           {d.certExpiresAt && ` Certificate expires ${date(d.certExpiresAt)}.`}
         </p>
       )}
+      {d.verified && <Lookalikes d={d} />}
       {!d.verified && (
         <div className="space-y-2">
           <p className="text-sm">
@@ -120,7 +157,7 @@ function DomainList({ onCheck }: { onCheck: (domain: string) => void }) {
   return (
     <div className="space-y-4 rounded-lg border border-border bg-surface p-4">
       {domains === null && !error && <p className="text-sm text-muted">Loading…</p>}
-      {domains?.length === 0 && <p className="text-sm text-muted">No saved domains yet. Add one you run to get alerts when its grade drops or its certificate is about to expire.</p>}
+      {domains?.length === 0 && <p className="text-sm text-muted">No saved domains yet. Add one you run to get alerts when its grade drops, its certificate is about to expire or a lookalike domain appears.</p>}
       {domains && domains.length > 0 && (
         <ul className="space-y-3">
           {domains.map((d) => (
@@ -181,7 +218,7 @@ export function MyDomains({ onCheck }: { onCheck: (domain: string) => void }) {
       {me?.signedIn && <DomainList onCheck={onCheck} />}
       {me && !me.signedIn && (
         <SignInForm
-          lead={`Sign in to save up to ${MAX_SAVED_DOMAINS} domains. Bluebench re-checks verified ones daily and alerts you when a grade drops or a certificate is close to expiring.`}
+          lead={`Sign in to save up to ${MAX_SAVED_DOMAINS} domains. Bluebench re-checks verified ones daily and alerts you when a grade drops, a certificate is close to expiring or a lookalike domain appears.`}
         />
       )}
     </section>

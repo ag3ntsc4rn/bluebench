@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { setCookie } from "hono/cookie";
 import {
+  ByoRequestSchema,
   canonicalDomain,
   orgDomain,
   canonicalIndicator,
@@ -9,11 +10,13 @@ import {
   LookupRequestSchema,
   SECURITY_HEADERS,
   SessionRequestSchema,
+  type ByoResponse,
   type DomainReport,
   type HealthResponse,
   type LookupResponse,
 } from "@bluebench/shared";
 import { account } from "./account.ts";
+import { relay } from "./byo.ts";
 import type { Env } from "./env.ts";
 import { domainReport, hasCachedReport } from "./domain/report.ts";
 import { admit, challenge, chargeDaily, clientIp, fail, notConfigured, readJson } from "./http.ts";
@@ -96,6 +99,25 @@ app.post("/lookup", async (c) => {
     waitUntil: (p) => c.executionCtx.waitUntil(p),
   });
   return c.json<LookupResponse>(result);
+});
+
+/**
+ * Bring-your-own-key relay for providers that don't allow cross-site calls (VirusTotal, AbuseIPDB,
+ * GreyNoise). Needs a session and counts toward the per-minute limits, but not the daily cap: it
+ * spends the user's quota, not ours. The keys and the indicator are passed on and never stored.
+ */
+app.post("/byo", async (c) => {
+  const a = await admit(c);
+  if (!a.ok) return a.res;
+
+  const body = await readJson(c);
+  if (!body.ok) return body.res;
+  const parsed = ByoRequestSchema.safeParse(body.data);
+  const value = parsed.success ? canonicalIndicator(parsed.data) : null;
+  if (!parsed.success || !value) {
+    return fail(c, 400, { error: "invalid", message: "That isn't something we can look up with your keys." });
+  }
+  return c.json<ByoResponse>({ ok: true, sources: await relay(parsed.data, value) });
 });
 
 /** Domain report card: DNS, email authentication, HTTPS, headers and certificate checks. */
