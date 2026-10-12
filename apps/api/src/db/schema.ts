@@ -98,9 +98,32 @@ export const domain = sqliteTable(
     certExpiresAt: time("cert_expires_at"),
     /** Smallest expiry threshold (30/14/7 days) already alerted for the current certificate. */
     certAlertedDays: integer("cert_alerted_days"),
+    /** Lookalike watcher: position in the variant list of the scan in progress (0 = start a new one). */
+    lookalikeCursor: integer("lookalike_cursor").notNull().default(0),
+    /** When the last full lookalike scan finished. Null = never; the first scan sets a baseline without alerts. */
+    lookalikeScannedAt: time("lookalike_scanned_at"),
+    /** Last lookalike chunk run (or attempt), so domains take turns. */
+    lookalikeCheckedAt: time("lookalike_checked_at"),
     createdAt: time("created_at").notNull(),
   },
   (t) => [uniqueIndex("domain_user_name").on(t.userId, t.name), index("domain_due").on(t.verifiedAt, t.lastCheckedAt)],
+);
+
+/** A lookalike of a saved domain that has a website (A record) or mail (MX). Deleted once it stops resolving. */
+export const lookalike = sqliteTable(
+  "lookalike",
+  {
+    id: text("id").primaryKey(),
+    domainId: text("domain_id")
+      .notNull()
+      .references(() => domain.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    web: integer("web", { mode: "boolean" }).notNull(),
+    mail: integer("mail", { mode: "boolean" }).notNull(),
+    firstSeenAt: time("first_seen_at").notNull(),
+    lastSeenAt: time("last_seen_at").notNull(),
+  },
+  (t) => [uniqueIndex("lookalike_domain_name").on(t.domainId, t.name)],
 );
 
 /** Alert history. Rows with no `deliveredAt` are waiting for the cron to send them. */

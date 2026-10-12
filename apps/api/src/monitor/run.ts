@@ -1,5 +1,5 @@
 import { orgDomain } from "@bluebench/shared";
-import { and, asc, eq, isNotNull, isNull, lt, lte, or } from "drizzle-orm";
+import { and, asc, eq, gt, isNotNull, isNull, lt, lte, ne, or } from "drizzle-orm";
 import { accountsEnabled, db, type Db } from "../auth.ts";
 import { alert, domain, pushSubscription, session, user, verification } from "../db/schema.ts";
 import { Budget, Resolver } from "../dns.ts";
@@ -8,6 +8,7 @@ import { runReport } from "../domain/report.ts";
 import type { Env } from "../env.ts";
 import { sendMail, takeEmailQuota } from "../mail.ts";
 import { sendPush, type PushMessage, type VapidKeys } from "../push.ts";
+import { lookalikeAlert, scanLookalikes } from "./lookalike.ts";
 import { certAlert, certAlertDays, gradeDropAlert, hasGradedChecks, mergeStatuses, verificationLostAlert, type AlertText } from "./rules.ts";
 import { hasVerifyRecord, verifyRecord } from "./verify.ts";
 
@@ -30,7 +31,7 @@ export interface TickDeps {
   waitUntil(p: Promise<unknown>): void;
 }
 
-export type TickResult = "off" | "delivered" | "checked" | "idle";
+export type TickResult = "off" | "delivered" | "checked" | "lookalikes" | "idle";
 
 export function vapidKeys(env: Env): VapidKeys | null {
   if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return null;
@@ -38,9 +39,11 @@ export function vapidKeys(env: Env): VapidKeys | null {
 }
 
 /**
- * One cron run (every minute): deliver pending alerts if there are any, otherwise re-check the domain
- * that's most overdue (each verified domain once a day). One job per run keeps every run well inside
- * the subrequest and CPU limits; at one check a minute that's ~1,400 domains a day.
+ * One cron run (every minute), one job per run to stay well inside the subrequest and CPU limits:
+ * 1. deliver pending alerts, else
+ * 2. re-check the domain that's most overdue (each verified domain once a day), else
+ * 3. scan the next chunk of a domain's lookalikes (a full scan of ~120 names takes about 3 runs, daily).
+ * A verified domain costs about 4 runs a day, so 1,440 runs cover roughly 350 domains.
  */
 export async function tick(env: Env, deps: TickDeps): Promise<TickResult> {
   if (!accountsEnabled(env)) return "off";
@@ -62,6 +65,22 @@ export async function tick(env: Env, deps: TickDeps): Promise<TickResult> {
   if (due) {
     await recheck(env, d, due, now, deps);
     return "checked";
+  }
+
+  const [scan] = await d
+    .select()
+    .from(domain)
+    .where(
+      and(
+        isNotNull(domain.verifiedAt),
+        or(gt(domain.lookalikeCursor, 0), isNull(domain.lookalikeScannedAt), lte(domain.lookalikeScannedAt, new Date(now - DAY_MS))),
+      ),
+    )
+    .orderBy(asc(domain.lookalikeCheckedAt))
+    .limit(1);
+  if (scan) {
+    await watchLookalikes(d, scan, now);
+    return "lookalikes";
   }
 
   if (new Date(now).getUTCMinutes() === 0) await housekeeping(d, now);
@@ -146,6 +165,13 @@ export async function recheck(env: Env, d: Db, row: DomainRow, now: number, deps
       .where(eq(domain.id, row.id)),
     ...alerts.map((a) => d.insert(alert).values(a)),
   ]);
+}
+
+/** One chunk of the lookalike watcher; one alert per run listing any new lookalikes. */
+export async function watchLookalikes(d: Db, row: DomainRow, now: number): Promise<void> {
+  const own = await d.select({ name: domain.name }).from(domain).where(and(eq(domain.userId, row.userId), ne(domain.id, row.id)));
+  const { fresh } = await scanLookalikes(d, row, now, new Set(own.map((o) => o.name)));
+  if (fresh.length > 0) await d.insert(alert).values(newAlert(row, "lookalike", lookalikeAlert(row.name, fresh), now));
 }
 
 type Sub = typeof pushSubscription.$inferSelect;

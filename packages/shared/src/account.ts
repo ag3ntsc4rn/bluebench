@@ -90,10 +90,23 @@ export interface SavedDomain {
   score: number | null;
   lastCheckedAt: string | null;
   certExpiresAt: string | null;
+  /** Lookalike domains with a website or mail, from the daily watcher. */
+  lookalikes: LookalikeHit[];
+  /** When the last full lookalike scan finished; null until the first one. */
+  lookalikesScannedAt: string | null;
   createdAt: string;
 }
 
-export type AlertKind = "grade-drop" | "cert-expiry" | "verification-lost" | "test";
+export interface LookalikeHit {
+  domain: string;
+  /** Has an A record. */
+  web: boolean;
+  /** Has an MX record (can send or receive mail as that name). */
+  mail: boolean;
+  firstSeenAt: string;
+}
+
+export type AlertKind = "grade-drop" | "cert-expiry" | "verification-lost" | "lookalike" | "test";
 
 export interface AlertItem {
   id: string;
