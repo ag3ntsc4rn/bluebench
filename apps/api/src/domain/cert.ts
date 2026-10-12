@@ -137,11 +137,11 @@ type Fetched = { ok: true; entries: CertEntry[] } | { ok: false; why: string };
 
 const UA = { "user-agent": "Bluebench/1.0 (+https://bluebench.dev)" };
 
-/** A quota permit for one source, unless the report's request budget is already spent. Returns why not, or null. */
-async function acquire(deps: CertDeps, key: "crtsh" | "certspotter"): Promise<string | null> {
+/** Quota permits for `cost` calls to one source, unless the report's request budget is spent. Returns why not, or null. */
+async function acquire(deps: CertDeps, key: "crtsh" | "certspotter", cost = 1): Promise<string | null> {
   if (deps.budget.used >= deps.budget.max) return "request budget used up";
   const quota = deps.env.PROVIDER_QUOTA.get(deps.env.PROVIDER_QUOTA.idFromName(key));
-  const permit = await quota.acquire(key, deps.tier).catch(() => ({ ok: false as const, reason: "rate" as const }));
+  const permit = await quota.acquire(key, deps.tier, undefined, cost).catch(() => ({ ok: false as const, reason: "rate" as const }));
   const name = key === "crtsh" ? "crt.sh" : "Cert Spotter";
   return permit.ok ? null : permit.reason === "daily" ? `today's ${name} budget is used up` : `${name} is busy, try again in a minute`;
 }
@@ -178,12 +178,18 @@ export const CERTSPOTTER_MAX_PAGES = 3;
 async function fromCertSpotter(domain: string, deps: CertDeps): Promise<Fetched> {
   const key = deps.env.CERTSPOTTER_API_KEY;
   if (!key) return { ok: false, why: "Cert Spotter isn't switched on" };
-  const denied = await acquire(deps, "certspotter");
+  // Every page counts against Cert Spotter's hourly limit. The usual answer is two pages (results, then the
+  // empty page that ends the list), so reserve those now and one more for each extra page.
+  const denied = await acquire(deps, "certspotter", 2);
   if (denied) return { ok: false, why: denied };
   const base = `https://api.certspotter.com/v1/issuances?domain=${encodeURIComponent(domain)}&include_subdomains=false&match_wildcards=true&expand=dns_names&expand=issuer`;
   const entries: CertEntry[] = [];
   let after: string | undefined;
   for (let page = 0; page <= CERTSPOTTER_MAX_PAGES; page++) {
+    if (page >= 2) {
+      const more = await acquire(deps, "certspotter");
+      if (more) return { ok: false, why: more };
+    }
     if (!deps.budget.take()) return { ok: false, why: "request budget used up" };
     try {
       const res = await fetch(after ? `${base}&after=${encodeURIComponent(after)}` : base, {

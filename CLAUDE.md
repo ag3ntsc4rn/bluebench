@@ -124,7 +124,7 @@ Out of scope for v1: CVE feed, one-time secrets, incident runbook, phishing quiz
 | Google Safe Browsing v4 | Shared, server-side | Never show a verdict past its cache duration; hedge wording ("suspected", "possible"); show "Advisory provided by Google"; state protection isn't perfect |
 | DNS-over-HTTPS (Cloudflare 1.1.1.1) | Shared | — |
 | crt.sh | Shared | ~5 req/min, no published limit; cache hard |
-| SSLMate Cert Spotter | Shared, fallback for crt.sh | API key required for production use; hourly query limit; cache hard |
+| SSLMate Cert Spotter | Shared, fallback for crt.sh | API key required for production use (keyless is personal/evaluation only). Free "Small" plan: 100 single-hostname queries/hour; we cap at 90 (`ProviderQuota` counts each page). Terms (sslmate.com/policies/tos, California law) say nothing on caching or display; SSLMate may change or end the free plan without notice |
 | VirusTotal, AbuseIPDB, AlienVault OTX, GreyNoise | **BYO key only** | Call with the user's key; never cache in KV or show to other users |
 
 ## Abuse protection
