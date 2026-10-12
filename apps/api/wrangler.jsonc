@@ -62,7 +62,7 @@
     // Sender for magic links and alert emails (Resend; the domain must be verified there).
     "EMAIL_FROM": "Bluebench <alerts@bluebench.dev>",
     // Web Push VAPID public key (base64url, 65-byte P-256 point). Empty = push switched off.
-    "VAPID_PUBLIC_KEY": ""
+    "VAPID_PUBLIC_KEY": "BDdWLL-O2wJNGZLXWMV82f8iqKAxMQTCoQ89rz7lqhgnkZYmIHqXRszEHT_ZXs07M3jL8ENWCV9mew-CmAX21XU"
   },
   // Secrets (wrangler secret put): TURNSTILE_SECRET_KEY, SESSION_SECRET, ABUSECH_AUTH_KEY, SAFE_BROWSING_API_KEY,
   // BETTER_AUTH_SECRET, RESEND_API_KEY, VAPID_PRIVATE_KEY
