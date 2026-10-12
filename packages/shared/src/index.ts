@@ -1,5 +1,6 @@
 export * from "./account.ts";
 export * from "./api.ts";
+export * from "./byo.ts";
 export * from "./detect.ts";
 export * from "./domain-report.ts";
 export * from "./domain.ts";

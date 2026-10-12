@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { detect, type IndicatorKind } from "./detect.ts";
+import type { ByoSourceId } from "./byo.ts";
 import { classifyIp, parseIp } from "./ip.ts";
 
 /** Indicator kinds the reputation API accepts. */
@@ -24,13 +25,20 @@ export const SessionRequestSchema = z.strictObject({
 });
 export type SessionRequest = z.infer<typeof SessionRequestSchema>;
 
+/** Shared sources: asked by our server with our keys, cached. */
 export type SourceId = "urlhaus" | "threatfox" | "malwarebazaar" | "safebrowsing";
+/** Shared sources plus the bring-your-own-key ones (see byo.ts). */
+export type AnySourceId = SourceId | ByoSourceId;
 
-export const SOURCE_LABELS: Readonly<Record<SourceId, string>> = {
+export const SOURCE_LABELS: Readonly<Record<AnySourceId, string>> = {
   urlhaus: "URLhaus",
   threatfox: "ThreatFox",
   malwarebazaar: "MalwareBazaar",
   safebrowsing: "Google Safe Browsing",
+  virustotal: "VirusTotal",
+  abuseipdb: "AbuseIPDB",
+  greynoise: "GreyNoise",
+  otx: "AlienVault OTX",
 };
 
 /** Which shared sources can answer for each kind. */
@@ -67,7 +75,7 @@ export interface SourceFact {
 }
 
 export interface SourceResult {
-  source: SourceId;
+  source: AnySourceId;
   status: SourceStatus;
   /** One plain-English line. Hedged for Safe Browsing ("Suspected …"). */
   summary: string;
