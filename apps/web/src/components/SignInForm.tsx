@@ -1,12 +1,80 @@
 import type { ApiError } from "@bluebench/shared";
 import { useId, useRef, useState, type FormEvent } from "react";
-import { requestSignIn } from "../lib/account";
+import { finishSignInWithCode, requestSignIn } from "../lib/account";
 import { runTurnstile } from "../lib/turnstile";
 import { Badge } from "./ui";
 
 type State = { phase: "idle" } | { phase: "sending" } | { phase: "sent"; email: string } | { phase: "error"; error: ApiError };
 
-/** Email a magic link. No passwords; the account exists once the link is used. */
+/**
+ * After the email is sent: tap the link, or type the 6-digit code. The code is for the home-screen app,
+ * because iOS opens email links in Safari, which doesn't share the app's cookies.
+ */
+function CodeEntry({ email, onRetry }: { email: string; onRetry: () => void }) {
+  const id = useId();
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const digits = code.replace(/\D/g, "");
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (digits.length !== 6) return;
+    setBusy(true);
+    setError(null);
+    const res = await finishSignInWithCode(email, digits);
+    // On success the shared account state flips and the page re-renders signed in.
+    if (!res.ok) {
+      setBusy(false);
+      setError(res.message);
+    }
+  };
+
+  return (
+    <form onSubmit={(e) => void submit(e)} aria-live="polite" className="space-y-3 rounded-lg border border-border bg-surface p-4">
+      <p className="font-medium">Check your inbox</p>
+      <p className="text-sm text-muted">
+        We sent a sign-in link and code to <span className="font-mono break-all text-fg">{email}</span>. Tap the link, or enter
+        the code here (best if you're using Bluebench from your home screen). Both work once, for 15 minutes.
+      </p>
+      <label htmlFor={id} className="block text-sm font-medium">
+        6-digit code
+      </label>
+      <input
+        id={id}
+        type="text"
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        enterKeyHint="go"
+        maxLength={7}
+        placeholder="123456"
+        value={code}
+        onChange={(e) => setCode(e.target.value.slice(0, 7))}
+        className="min-h-11 w-40 rounded-md border border-border bg-ground px-3 font-mono text-lg tracking-widest text-fg placeholder:text-muted focus:border-accent focus:outline-none"
+      />
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="submit"
+          disabled={digits.length !== 6 || busy}
+          className="min-h-11 rounded-md bg-accent px-4 text-sm font-medium text-on-accent disabled:opacity-50"
+        >
+          {busy ? "Signing in…" : "Sign in"}
+        </button>
+        <button type="button" onClick={onRetry} className="min-h-11 text-sm text-muted underline hover:text-fg">
+          Nothing arrived? Send again
+        </button>
+      </div>
+      {error && (
+        <p className="flex items-start gap-2 text-sm">
+          <Badge tone="warn">Error</Badge>
+          <span>{error}</span>
+        </p>
+      )}
+    </form>
+  );
+}
+
+/** Email a magic link and code. No passwords; the account exists once one of them is used. */
 export function SignInForm({ lead }: { lead?: string }) {
   const id = useId();
   const [email, setEmail] = useState("");
@@ -24,19 +92,7 @@ export function SignInForm({ lead }: { lead?: string }) {
   };
 
   if (state.phase === "sent") {
-    return (
-      <div aria-live="polite" className="space-y-2 rounded-lg border border-border bg-surface p-4">
-        <p className="font-medium">Check your inbox</p>
-        <p className="text-sm text-muted">
-          We sent a sign-in link to <span className="font-mono break-all text-fg">{state.email}</span>. It works once, for 15
-          minutes. Nothing there? Check spam, or{" "}
-          <button type="button" onClick={() => setState({ phase: "idle" })} className="min-h-11 underline hover:text-fg">
-            try again
-          </button>
-          .
-        </p>
-      </div>
-    );
+    return <CodeEntry email={state.email} onRetry={() => setState({ phase: "idle" })} />;
   }
 
   return (

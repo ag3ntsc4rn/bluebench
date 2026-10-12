@@ -7,6 +7,7 @@ import {
   PushSubscriptionSchema,
   PushUnsubscribeSchema,
   SaveDomainSchema,
+  SignInCodeSchema,
   SignInRequestSchema,
   VerifySignInSchema,
   type AlertItem,
@@ -16,8 +17,8 @@ import {
   type SavedDomain,
 } from "@bluebench/shared";
 import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
-import { accountsEnabled, currentUser, db, getAuth, MailFailed, type AccountUser } from "./auth.ts";
-import { alert, domain, pushSubscription, user } from "./db/schema.ts";
+import { accountsEnabled, CODE_ATTEMPTS, currentUser, db, getAuth, MailFailed, type AccountUser } from "./auth.ts";
+import { alert, domain, pushSubscription, user, verification } from "./db/schema.ts";
 import { Budget, Resolver } from "./dns.ts";
 import type { Env } from "./env.ts";
 import { admit, clientIp, fail, readJson, tooFast, type Ctx } from "./http.ts";
@@ -120,7 +121,11 @@ account.post("/signin", async (c) => {
   }
 
   try {
-    await getAuth(c.env).api.signInMagicLink({ body: { email }, headers: c.req.raw.headers });
+    const auth = getAuth(c.env);
+    // One code per address at a time: a new email replaces the previous code (the plugin's identifier format).
+    await db(c.env).delete(verification).where(eq(verification.identifier, `sign-in-otp-${email}`));
+    const code = await auth.api.createVerificationOTP({ body: { email, type: "sign-in" } });
+    await auth.api.signInMagicLink({ body: { email, metadata: { code } }, headers: c.req.raw.headers });
   } catch (e) {
     const message = e instanceof MailFailed ? "We couldn't send the email just now. Try again in a few minutes." : "Something went wrong on our side. Try again shortly.";
     return fail(c, 503, { error: "unavailable", message });
@@ -141,6 +146,29 @@ account.post("/signin/verify", async (c) => {
   // Without a callbackURL Better Auth answers 200 with JSON on success, and redirects on failure.
   const res = await getAuth(c.env).api.magicLinkVerify({ query: { token: parsed.data.token }, headers: c.req.raw.headers, asResponse: true });
   if (res.status !== 200) return expired();
+  forwardCookies(c, res);
+  const data = (await res.json()) as { user: { id: string; email: string; emailAlerts?: boolean } };
+  return c.json<Me>(me(c.env, { id: data.user.id, email: data.user.email, emailAlerts: data.user.emailAlerts !== false }));
+});
+
+/** Sign in with the 6-digit code from the email (for the installed app, which email links can't reach). */
+account.post("/signin/code", async (c) => {
+  if (!accountsEnabled(c.env)) return accountsOff(c);
+  if (!(await c.env.IP_LIMITER.limit({ key: `code:${clientIp(c)}` })).success) return tooFast(c, "Too many attempts. Wait a minute and try again.");
+  const body = await readJson(c);
+  if (!body.ok) return body.res;
+  const parsed = SignInCodeSchema.safeParse(body.data);
+  if (!parsed.success) return fail(c, 400, { error: "invalid", message: "Enter the 6-digit code from the email." });
+
+  const res = await getAuth(c.env).api.signInEmailOTP({
+    body: { email: parsed.data.email.trim().toLowerCase(), otp: parsed.data.code },
+    headers: c.req.raw.headers,
+    asResponse: true,
+  });
+  if (res.status === 403) {
+    return fail(c, 400, { error: "invalid", message: `That's ${CODE_ATTEMPTS} wrong tries, so this code no longer works. Request a new email.` });
+  }
+  if (res.status !== 200) return fail(c, 400, { error: "invalid", message: "That code is wrong or has expired. Check the newest email from us." });
   forwardCookies(c, res);
   const data = (await res.json()) as { user: { id: string; email: string; emailAlerts?: boolean } };
   return c.json<Me>(me(c.env, { id: data.user.id, email: data.user.email, emailAlerts: data.user.emailAlerts !== false }));

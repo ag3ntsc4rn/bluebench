@@ -88,6 +88,13 @@ export async function finishSignIn(token: string): Promise<Me | ApiError> {
   return res;
 }
 
+/** Sign in with the 6-digit code from the email (the installed app can't receive the link on iOS). */
+export async function finishSignInWithCode(email: string, code: string): Promise<Me | ApiError> {
+  const res = await requestJson<Me>("POST", "/api/signin/code", { email, code });
+  if (res.ok) set(res);
+  return res;
+}
+
 export async function signOut(): Promise<void> {
   await requestJson("POST", "/api/signout");
   set(SIGNED_OUT);

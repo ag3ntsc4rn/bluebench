@@ -16,6 +16,12 @@ export const VerifySignInSchema = z.strictObject({
   token: z.string().min(16).max(128).regex(/^[A-Za-z0-9_-]+$/),
 });
 
+/** The 6-digit code from the sign-in email, for the installed app (iOS opens email links in Safari, not the app). */
+export const SignInCodeSchema = z.strictObject({
+  email: z.email().max(254),
+  code: z.string().regex(/^\d{6}$/),
+});
+
 export const SaveDomainSchema = z.strictObject({
   domain: z.string().min(1).max(253),
 });

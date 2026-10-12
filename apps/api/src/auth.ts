@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth/minimal";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { emailOTP } from "better-auth/plugins/email-otp";
 import { magicLink } from "better-auth/plugins/magic-link";
 import { drizzle } from "drizzle-orm/d1";
 import * as schema from "./db/schema.ts";
@@ -9,20 +10,23 @@ import { sendMail } from "./mail.ts";
 export const db = (env: Env) => drizzle(env.DB, { schema });
 export type Db = ReturnType<typeof db>;
 
-/** Magic links work for 15 minutes (email can be slow), once. */
+/** Magic links and sign-in codes work for 15 minutes (email can be slow), once. */
 const MAGIC_LINK_TTL_S = 15 * 60;
+/** Wrong guesses allowed per sign-in code before it stops working. */
+export const CODE_ATTEMPTS = 3;
 const SESSION_TTL_S = 30 * 24 * 3600;
 
 /** Accounts need a database, a signing secret and a way to send the magic link. */
 export const accountsEnabled = (env: Env) => Boolean(env.BETTER_AUTH_SECRET && env.RESEND_API_KEY && env.DB);
 
-function magicLinkEmail(url: string): string {
+function magicLinkEmail(url: string, code: string | undefined): string {
   return [
     "Here's your link to sign in to Bluebench:",
     "",
     url,
     "",
-    "It works once, for the next 15 minutes. If you didn't ask for it, ignore this email: nothing happens unless the link is opened.",
+    ...(code ? ["Using Bluebench from your home screen? Enter this code there instead:", "", code, ""] : []),
+    "Each works once, for the next 15 minutes. If you didn't ask for this, ignore this email: nothing happens unless the link is opened or the code is entered.",
     "",
     "Bluebench, the free security toolkit",
   ].join("\n");
@@ -58,10 +62,24 @@ function createAuth(env: Env) {
         storeToken: "hashed",
         // The link opens a page that asks for a click before using the token, so mail scanners that
         // fetch links can't burn it. The token is in the fragment, so it never reaches a server log.
-        sendMagicLink: async ({ email, token }) => {
+        // `metadata.code` is the 6-digit code created just before (see /api/signin), sent in the same email.
+        sendMagicLink: async ({ email, token, metadata }) => {
           const url = `${env.SITE_ORIGIN}/signin#token=${token}`;
-          const sent = await sendMail(env, { to: email, subject: "Your Bluebench sign-in link", text: magicLinkEmail(url) });
+          const code = typeof metadata?.code === "string" ? metadata.code : undefined;
+          const sent = await sendMail(env, { to: email, subject: "Your Bluebench sign-in link", text: magicLinkEmail(url, code) });
           if (!sent) throw new MailFailed();
+        },
+      }),
+      // A code alongside the link, for the home-screen app: iOS always opens email links in Safari, whose
+      // cookies the installed app doesn't share. Codes are only created by our route (createVerificationOTP)
+      // and go out in the magic-link email, so the plugin's own sender is never used.
+      emailOTP({
+        otpLength: 6,
+        expiresIn: MAGIC_LINK_TTL_S,
+        allowedAttempts: CODE_ATTEMPTS,
+        storeOTP: "hashed",
+        sendVerificationOTP: async () => {
+          throw new Error("Sign-in codes are sent with the magic link");
         },
       }),
     ],

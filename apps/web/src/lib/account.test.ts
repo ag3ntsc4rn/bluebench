@@ -15,6 +15,16 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("account store", () => {
+  it("signs in with an emailed code and remembers it", async () => {
+    const f = vi.fn(async () => Response.json(SIGNED_IN));
+    vi.stubGlobal("fetch", f);
+    const { account, finishSignInWithCode } = await import("./account");
+    expect(await finishSignInWithCode("a@example.org", "123456")).toEqual(SIGNED_IN);
+    expect(f.mock.calls[0]).toMatchObject(["/api/signin/code", { method: "POST", body: JSON.stringify({ email: "a@example.org", code: "123456" }) }]);
+    expect(account.get()).toEqual(SIGNED_IN);
+    expect(localStorage.getItem("bb.signedIn")).toBe("1");
+  });
+
   it("doesn't call the server for visitors who never signed in", async () => {
     const f = vi.fn();
     vi.stubGlobal("fetch", f);
