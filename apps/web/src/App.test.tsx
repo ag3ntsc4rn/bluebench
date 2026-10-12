@@ -76,6 +76,7 @@ describe("App", () => {
       expect(html).toContain('aria-label="Settings"'); // top bar on mobile
       expect(html).toMatch(/<a href="\/about"[^>]*>About<\/a>/);
       expect(html).toContain('href="https://github.com/ag3ntsc4rn/bluebench"');
+      expect(html).toMatch(/<a href="https:\/\/github\.com\/sponsors\/ag3ntsc4rn"[^>]*>Donate<\/a>/);
     }
   });
 });

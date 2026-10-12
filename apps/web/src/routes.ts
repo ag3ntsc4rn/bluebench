@@ -8,11 +8,8 @@ export const SITE_URL = "https://bluebench.dev";
 export const SITE_NAME = "Bluebench";
 /** The public source code. */
 export const SOURCE_URL = "https://github.com/ag3ntsc4rn/bluebench";
-/**
- * Where donations go (GitHub Sponsors once the profile is approved: https://github.com/sponsors/ag3ntsc4rn).
- * Null until then: pages say donations are opening soon instead of linking to a dead page.
- */
-export const DONATE_URL: string | null = null;
+/** Where donations go. Set to null to hide donate links (pages then say donations open soon). */
+export const DONATE_URL: string | null = "https://github.com/sponsors/ag3ntsc4rn";
 
 export type ToolSlug = "ioc-lookup" | "jwt-decoder" | "email-header-analyzer" | "base64-decoder" | "url-decoder";
 
