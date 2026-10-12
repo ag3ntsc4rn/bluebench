@@ -28,6 +28,40 @@ function setHint(on: boolean) {
   }
 }
 
+/**
+ * The address a sign-in email just went to, for 15 minutes (as long as the code works). iOS often
+ * reloads the home-screen app while you switch to Mail, so the code box must survive a reload.
+ */
+const PENDING = "bb.pendingSignIn";
+const PENDING_TTL_MS = 15 * 60 * 1000;
+
+export function rememberPendingSignIn(email: string, now = Date.now()) {
+  try {
+    localStorage.setItem(PENDING, JSON.stringify({ email, at: now }));
+  } catch {
+    // Storage blocked: the code box just won't survive a reload.
+  }
+}
+
+export function pendingSignIn(now = Date.now()): string | null {
+  try {
+    const p = JSON.parse(localStorage.getItem(PENDING) ?? "null") as { email?: unknown; at?: unknown } | null;
+    if (p && typeof p.email === "string" && typeof p.at === "number" && now - p.at < PENDING_TTL_MS) return p.email;
+    localStorage.removeItem(PENDING);
+  } catch {
+    // Unreadable or blocked: treat as none.
+  }
+  return null;
+}
+
+export function clearPendingSignIn() {
+  try {
+    localStorage.removeItem(PENDING);
+  } catch {
+    // Nothing to clear.
+  }
+}
+
 type Listener = () => void;
 const listeners = new Set<Listener>();
 /** null until we know (only while the hint says signed in and /api/me hasn't answered). */
@@ -37,6 +71,7 @@ let loading: Promise<void> | null = null;
 function set(next: Me) {
   me = next;
   setHint(next.signedIn);
+  if (next.signedIn) clearPendingSignIn();
   listeners.forEach((l) => l());
 }
 

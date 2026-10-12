@@ -14,6 +14,25 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
+describe("pending sign-in", () => {
+  it("remembers the address for 15 minutes, then forgets it", async () => {
+    const { pendingSignIn, rememberPendingSignIn } = await import("./account");
+    const t = Date.UTC(2026, 9, 12);
+    rememberPendingSignIn("a@example.org", t);
+    expect(pendingSignIn(t + 14 * 60_000)).toBe("a@example.org");
+    expect(pendingSignIn(t + 16 * 60_000)).toBeNull();
+    expect(localStorage.getItem("bb.pendingSignIn")).toBeNull();
+  });
+
+  it("is cleared once signed in", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json(SIGNED_IN)));
+    const { finishSignInWithCode, pendingSignIn, rememberPendingSignIn } = await import("./account");
+    rememberPendingSignIn("a@example.org");
+    await finishSignInWithCode("a@example.org", "123456");
+    expect(pendingSignIn()).toBeNull();
+  });
+});
+
 describe("account store", () => {
   it("signs in with an emailed code and remembers it", async () => {
     const f = vi.fn(async () => Response.json(SIGNED_IN));

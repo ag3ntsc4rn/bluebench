@@ -178,7 +178,9 @@ export function PrivacyPage() {
           If you sign in, we also set <code className="font-mono text-sm">__Secure-bb.session_token</code>, which keeps you
           signed in for up to 30 days, and the app remembers in your browser's local storage that you're signed in (
           <code className="font-mono text-sm">bb.signedIn</code>), so it only asks our server about your account when you
-          have one.
+          have one. For 15 minutes after you ask for a sign-in email, it also keeps the address it went to (
+          <code className="font-mono text-sm">bb.pendingSignIn</code>), so the code box is still there if your phone
+          reloads the app while you check your email.
         </p>
         <p>The app also caches its own files on your device so it works offline and can be installed.</p>
       </Section>
