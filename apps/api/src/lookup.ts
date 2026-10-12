@@ -32,7 +32,7 @@ type CacheEntry = Partial<Record<SourceId, CachedSource>>;
 const SKIP_REASONS: Record<QuotaDenial | "unconfigured", string> = {
   unconfigured: "Not switched on for this server yet.",
   rate: "Busy right now. Try again in a minute.",
-  daily: "Today's shared budget for this source is used up. It resets at midnight UTC; signing in and your own API keys are coming soon.",
+  daily: "Today's shared budget for this source is used up. It resets at midnight UTC. Signed-in accounts get a bigger share, and your own API keys (Settings) work any time.",
 };
 
 function cachePolicy(source: SourceId, answer: ProviderAnswer, now: number): { freshUntil: number; staleUntil: number } | null {

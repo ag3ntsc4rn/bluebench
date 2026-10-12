@@ -1,7 +1,7 @@
 import type { LookupResponse } from "@bluebench/shared";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { Reputation, ReputationResult } from "./Reputation";
+import { ownKeysNote, Reputation, ReputationResult } from "./Reputation";
 
 const text = (html: string) => html.replace(/<!-- -->/g, "").replace(/&#x27;/g, "'").replace(/&amp;/g, "&");
 
@@ -47,5 +47,15 @@ describe("ReputationResult", () => {
     const html = text(renderToString(<ReputationResult result={{ ...result, verdict: "not-listed", sources: [result.sources[0]!] }} />));
     expect(html).toContain("isn't proof it's safe");
     expect(html).not.toContain("Advisory provided by Google"); // no Safe Browsing result shown
+  });
+});
+
+describe("ownKeysNote", () => {
+  it("says which keys go through our server", () => {
+    expect(ownKeysNote(["otx"])).toBe("Also checks AlienVault OTX with your own key, straight from your browser.");
+    expect(ownKeysNote(["virustotal"])).toBe("Also checks VirusTotal with your own key, through our server, which passes your key on without storing it.");
+    expect(ownKeysNote(["virustotal", "abuseipdb", "otx"])).toBe(
+      "Also checks VirusTotal, AbuseIPDB and AlienVault OTX with your own keys, OTX straight from your browser, the others through our server, which passes your key on without storing it.",
+    );
   });
 });

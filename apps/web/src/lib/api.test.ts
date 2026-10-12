@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { LookupResponse } from "@bluebench/shared";
-import { lookupReputation } from "./api";
+import { byoLookup, lookupReputation } from "./api";
 
 const OK: LookupResponse = { ok: true, kind: "domain", value: "example.com", verdict: "not-listed", sources: [] };
 
@@ -54,5 +54,37 @@ describe("lookupReputation", () => {
     expect(!bare.ok && bare.message).toBe("Something went wrong on our side. Try again shortly.");
     const offline = await lookupReputation("domain", "x.com", vi.fn(), fakeFetch(new TypeError("offline")) as unknown as typeof fetch);
     expect(!offline.ok && offline.message).toContain("Check your connection");
+  });
+});
+
+describe("byoLookup", () => {
+  const KEY = "k".repeat(64);
+  const otxAnswer = { pulse_info: { count: 2, pulses: [{ name: "Phishing kit" }] }, validation: [] };
+  const relayAnswer = { ok: true, sources: [{ source: "virustotal", status: "not-listed", summary: "No vendor flags this as malicious (70 checked).", facts: [] }] };
+
+  it("asks OTX directly without cookies, and the rest through the relay", async () => {
+    const f = vi.fn(async (url: string, _init?: RequestInit) => (url.startsWith("https://otx") ? Response.json(otxAnswer) : Response.json(relayAnswer)));
+    const res = await byoLookup("domain", "evil.example", { otx: KEY, virustotal: KEY, abuseipdb: KEY }, vi.fn(), f as unknown as typeof fetch);
+    expect(res.map((r) => [r.source, r.status])).toEqual([
+      ["virustotal", "not-listed"],
+      ["otx", "listed"],
+    ]);
+    const otx = f.mock.calls.find((c) => c[0].startsWith("https://otx"))!;
+    expect(otx[1]).toMatchObject({ credentials: "omit", referrerPolicy: "no-referrer", headers: { "X-OTX-API-KEY": KEY } });
+    const relay = f.mock.calls.find((c) => c[0] === "/api/byo")!;
+    // AbuseIPDB can't answer for a domain, so its key isn't sent anywhere.
+    expect(JSON.parse(relay[1]!.body as string)).toEqual({ kind: "domain", value: "evil.example", keys: { virustotal: KEY } });
+  });
+
+  it("turns a relay failure into an error per source", async () => {
+    const f = vi.fn(async () => Response.json({ ok: false, error: "rate-limited", message: "Wait a minute." }, { status: 429 }));
+    const res = await byoLookup("ipv4", "185.220.101.7", { greynoise: KEY }, vi.fn(), f as unknown as typeof fetch);
+    expect(res).toEqual([{ source: "greynoise", status: "error", summary: "Wait a minute.", facts: [] }]);
+  });
+
+  it("does nothing without keys", async () => {
+    const f = vi.fn();
+    expect(await byoLookup("md5", "0".repeat(32), {}, vi.fn(), f as unknown as typeof fetch)).toEqual([]);
+    expect(f).not.toHaveBeenCalled();
   });
 });
