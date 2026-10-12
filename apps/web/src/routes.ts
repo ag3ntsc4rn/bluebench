@@ -218,9 +218,9 @@ export const DOMAINS: ContentPage = {
 /** The Alerts tab: domain monitoring, notifications and the account. */
 export const ALERTS: PageMeta = {
   path: "/alerts",
-  title: "Domain monitoring alerts: grade drops and certificate expiry | Bluebench",
+  title: "Domain monitoring: grade drops, certificate expiry, lookalikes | Bluebench",
   description:
-    "Free daily monitoring for up to 5 domains you control: push or email alerts when a security grade drops or a certificate is about to expire.",
+    "Free daily monitoring for up to 5 domains you control: push or email alerts when a security grade drops, a certificate nears expiry or a lookalike domain appears.",
 };
 
 /** Where magic links land. Not indexed. */
