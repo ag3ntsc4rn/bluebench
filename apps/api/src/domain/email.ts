@@ -220,11 +220,11 @@ export async function dmarcCheck(r: Resolver, domain: string, receivesMail: bool
 
 /**
  * Common selectors: Google, Microsoft 365, Mailchimp/Mandrill, Fastmail, Proton, Zoho, iCloud,
- * plus generic defaults. Selectors can be any name, so "none found" is only a hint.
+ * Resend, Mailjet, Mailgun and HubSpot, plus generic defaults. Each costs one DNS query of the report's budget. Selectors can be any name, so "none found" is only a hint.
  */
 export const DKIM_SELECTORS = [
   "google", "selector1", "selector2", "k1", "k2", "s1", "s2", "default", "dkim", "mail",
-  "fm1", "protonmail", "zoho", "sig1", "mandrill",
+  "fm1", "protonmail", "zoho", "sig1", "mandrill", "resend", "mailjet", "smtp", "hs1",
 ] as const;
 
 /** Rough RSA key size from the base64 p= value; 0 for an empty (revoked) key. */
