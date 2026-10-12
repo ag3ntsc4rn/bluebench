@@ -26,6 +26,8 @@ export interface FakeNet {
   sites?: Record<string, Site>;
   /** crt.sh JSON rows, or a status code to fail with. */
   crtsh?: object[] | number;
+  /** Answer anything else (Resend, push services, …); return undefined to fall through. */
+  handle?: (req: Request, url: URL) => Response | undefined | Promise<Response | undefined>;
 }
 
 /** Stub fetch with a fake DoH resolver, websites and crt.sh. Returns the log of outbound URLs. */
@@ -50,6 +52,8 @@ export function mockNet(net: FakeNet) {
       if (typeof net.crtsh === "number") return new Response("busy", { status: net.crtsh });
       return Response.json(net.crtsh ?? []);
     }
+    const handled = await net.handle?.(req, url);
+    if (handled) return handled;
     const site = net.sites?.[url.href];
     if (!site) throw new TypeError("connection refused");
     return new Response("<html></html>", { status: site.status ?? 200, headers: site.headers ?? {} });

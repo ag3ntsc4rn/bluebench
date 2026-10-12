@@ -32,14 +32,62 @@ export function PrivacyPage() {
 
       <Section title="The short version">
         <ul className="list-disc space-y-1 pl-5">
-          <li>No accounts needed, no ads, no analytics, no tracking scripts.</li>
+          <li>No ads, no analytics, no tracking scripts. Every tool works without an account.</li>
           <li>Nothing you paste is logged.</li>
           <li>
             Most tools run entirely in your browser. Something leaves your device only when you press Check reputation or
             Check domain.
           </li>
-          <li>We set one cookie, and only after you ask for a reputation lookup or a domain check.</li>
+          <li>We set a cookie only when you use something that needs it: a lookup or domain check, or signing in.</li>
+          <li>
+            An account is optional. It holds your email address, the domains you save and your alerts, and you can delete it
+            yourself at any time.
+          </li>
         </ul>
+      </Section>
+
+      <Section title="Accounts and alerts (optional)">
+        <p>
+          You only need an account to save domains and get alerts about them. Signing in works with a one-time link sent to
+          your email address; there's no password. If you have an account, we store:
+        </p>
+        <ul className="list-disc space-y-2 pl-5">
+          <li>
+            <strong>Your email address</strong>, used only for sign-in links and the alert emails you allow.
+          </li>
+          <li>
+            <strong>The domains you save</strong> (up to 5), a random verification code for each, and the latest daily
+            result: the grade, each check's status and the certificate's expiry date.
+          </li>
+          <li>
+            <strong>Your alerts</strong> (for example "grade dropped from A to C"), kept for 180 days so you can see them on
+            the Alerts tab.
+          </li>
+          <li>
+            <strong>Push subscriptions</strong>, if you turn on notifications: the address your browser's push service gave
+            this device, and the keys used to encrypt notifications for it.
+          </li>
+          <li>
+            <strong>Your sign-in session</strong>: a random token that lasts 30 days, renewed while you use it. We don't store
+            your IP address or browser details with it. Sign-in links work once, expire after 15 minutes, and are stored
+            only as a one-way hash.
+          </li>
+        </ul>
+        <p>
+          This is kept in Cloudflare's D1 database. <strong>Delete account</strong> on the Alerts tab erases all of it
+          straight away.
+        </p>
+        <p>
+          <strong>Daily checks.</strong> Once you prove you control a saved domain (with a DNS TXT record), our server runs
+          the same domain check described below on it once a day, and compares the result with the day before.
+        </p>
+        <p>
+          <strong>Who helps deliver alerts.</strong> Emails (sign-in links, and alerts when push isn't available) are sent
+          through Resend, which receives your address and the email's text (
+          <Ext href="https://resend.com/legal/privacy-policy">Resend's privacy policy</Ext>). Push notifications travel
+          through your browser's push service (Google for Chrome and Android, Mozilla for Firefox, Apple for Safari,
+          Microsoft for older Edge). They're encrypted for your device, so the push service can't read them.
+        </p>
       </Section>
 
       <Section title="What stays in your browser">
@@ -95,8 +143,9 @@ export function PrivacyPage() {
             the site or crt.sh again. They're filed under a one-way hash, and the domain name is removed from what's stored.
           </li>
           <li>
-            <strong>Daily counters</strong> for lookups and domain checks, for fair-use limits: a count per session and per network address, stored
-            only as keyed one-way hashes and deleted after the day ends (UTC).
+            <strong>Daily counters</strong> for lookups, domain checks and sign-in emails, for fair-use limits: a count per
+            session, per account, per email address and per network address, stored only as keyed one-way hashes and
+            deleted after the day ends (UTC).
           </li>
           <li>
             <strong>Per-minute rate limits</strong>: Cloudflare's rate-limiting service briefly sees your IP address (for IPv6,
@@ -121,25 +170,32 @@ export function PrivacyPage() {
 
       <Section title="Cookies and local storage">
         <p>
-          After the bot check we set one cookie, <code className="font-mono text-sm">__Host-bb_session</code>: a random,
-          signed session ID that expires after 24 hours. It's needed for lookups and domain checks to work and isn't used
-          for anything else.
-          The app also caches its own files on your device so it works offline and can be installed.
+          After the bot check we set <code className="font-mono text-sm">__Host-bb_session</code>: a random, signed session
+          ID that expires after 24 hours. It's needed for lookups and domain checks to work and isn't used for anything
+          else.
         </p>
+        <p>
+          If you sign in, we also set <code className="font-mono text-sm">__Secure-bb.session_token</code>, which keeps you
+          signed in for up to 30 days, and the app remembers in your browser's local storage that you're signed in (
+          <code className="font-mono text-sm">bb.signedIn</code>), so it only asks our server about your account when you
+          have one.
+        </p>
+        <p>The app also caches its own files on your device so it works offline and can be installed.</p>
       </Section>
 
       <Section title="Questions and requests">
         <p>
-          Email <a href={`mailto:${PRIVACY_CONTACT}`} className="text-accent underline">{PRIVACY_CONTACT}</a>. We don't
-          have accounts or logs, so we usually hold nothing that identifies you, but we'll answer any question about your
-          data, including on Cloudflare Turnstile's processing for this site.
+          Email <a href={`mailto:${PRIVACY_CONTACT}`} className="text-accent underline">{PRIVACY_CONTACT}</a>. Without an
+          account we hold nothing that identifies you, as we keep no logs. With one, we hold only what's listed above, and
+          we'll send you a copy if you ask. We'll answer any question about your data, including on Cloudflare
+          Turnstile's processing for this site.
         </p>
       </Section>
 
       <Section title="Changes">
         <p>
-          If this changes, for example when optional sign-in arrives, we'll update this page before the change goes live
-          and change the date at the top.
+          If what we collect or who we share it with changes, we'll update this page before the change goes live and change
+          the date at the top.
         </p>
       </Section>
     </article>

@@ -1,6 +1,6 @@
 import { renderToString } from "react-dom/server";
 import { App } from "./App";
-import { DOMAINS, HOME, NOT_FOUND, PRIVACY, SITE_NAME, SITE_URL, TOOLS, type PageMeta } from "./routes";
+import { ALERTS, DOMAINS, HOME, NOT_FOUND, PRIVACY, SIGNIN, SITE_NAME, SITE_URL, TOOLS, type PageMeta } from "./routes";
 
 /** Build-time only: turns each route into a static HTML file, so crawlers and link previews see real content. */
 
@@ -8,7 +8,7 @@ export interface PrerenderedPage {
   /** Output file in dist, e.g. "jwt-decoder.html" (served at /jwt-decoder). */
   file: string;
   html: string;
-  /** Listed in sitemap.xml (everything except the 404 page). */
+  /** Listed in sitemap.xml (everything except the 404 and sign-in pages). */
   inSitemap: boolean;
   path: string;
 }
@@ -61,6 +61,8 @@ export function prerenderPages(template: string): PrerenderedPage[] {
     page(PRIVACY, "privacy.html"),
     ...TOOLS.map((t) => page(t, `${t.slug}.html`)),
     page(DOMAINS, "domain-checker.html"),
+    page(ALERTS, "alerts.html"),
+    page(SIGNIN, "signin.html", false),
     page(NOT_FOUND, "404.html", false),
   ];
 }

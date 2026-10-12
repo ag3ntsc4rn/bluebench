@@ -1,14 +1,19 @@
 import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import { Nav } from "./components/Nav";
 import { UpdateBanner } from "./components/UpdateBanner";
+import { AlertsPage } from "./pages/AlertsPage";
 import { DomainsPage } from "./pages/DomainsPage";
 import { LookupPage } from "./pages/LookupPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
+import { SignInPage } from "./pages/SignInPage";
 import { Explainer, ToolPage } from "./pages/ToolPage";
 import { DOMAINS, metaFor, pageForPath, pathOf, TOOLS, type Page } from "./routes";
 import { TABS, type TabId } from "./tabs";
+
+// Tool pages belong to the Lookup tab, the domain checker to Domains; Privacy, sign-in and 404 to none.
+const TAB_OF: Partial<Record<Page["kind"], TabId>> = { tool: "lookup", domains: "domains", alerts: "alerts" };
 
 const currentPath = () => (typeof location === "undefined" ? "/" : location.pathname);
 
@@ -58,14 +63,16 @@ export function App({ initialTab = "lookup", initialPath }: { initialTab?: TabId
         <Explainer sections={DOMAINS.sections} />
       </div>
     );
+  else if (page.kind === "alerts") content = <AlertsPage />;
+  else if (page.kind === "signin") content = <SignInPage onDone={() => go({ kind: "domains" })} />;
   else if (page.kind === "tool") content = <ToolPage key={page.tool.slug} tool={page.tool} />;
   else if (page.kind === "notfound") content = <NotFoundPage />;
   else if (tab.id === "lookup") content = <LookupPage />;
   else if (tab.id === "domains") content = <DomainsPage />;
+  else if (tab.id === "alerts") content = <AlertsPage />;
   else content = <PlaceholderPage title={tab.label} comingSoon={tab.comingSoon} />;
 
-  // Tool pages belong to the Lookup tab, the domain checker to Domains; Privacy and 404 to none.
-  const navActive = page.kind === "home" ? active : page.kind === "tool" ? "lookup" : page.kind === "domains" ? "domains" : null;
+  const navActive = page.kind === "home" ? active : (TAB_OF[page.kind] ?? null);
 
   return (
     <div className="min-h-dvh md:pl-60">
@@ -100,7 +107,7 @@ export function App({ initialTab = "lookup", initialPath }: { initialTab?: TabId
         active={navActive}
         onSelect={(id) => {
           setActive(id);
-          go(id === "domains" ? { kind: "domains" } : { kind: "home" });
+          go(id === "domains" ? { kind: "domains" } : id === "alerts" ? { kind: "alerts" } : { kind: "home" });
         }}
       />
     </div>

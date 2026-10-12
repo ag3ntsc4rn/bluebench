@@ -5,3 +5,10 @@ SESSION_SECRET=dev-only-change-me
 # Optional: real keys to try live lookups locally. Leave unset to see sources "not switched on".
 # ABUSECH_AUTH_KEY=
 # SAFE_BROWSING_API_KEY=
+# Accounts (magic-link sign-in) need these. Run `pnpm --filter @bluebench/api db:migrate:local` first.
+# BETTER_AUTH_SECRET=dev-only-change-me-to-32-or-more-characters
+# RESEND_API_KEY=            # real key: sign-in emails are really sent
+# SITE_ORIGIN=http://localhost:8787   # so magic links point at your dev server
+# Push (optional): generate a pair as described in README.md.
+# VAPID_PUBLIC_KEY=
+# VAPID_PRIVATE_KEY=

@@ -22,8 +22,17 @@ describe("PrivacyPage", () => {
     expect(html).toContain("Domain reports");
   });
 
-  it("names the one cookie we set", () => {
+  it("names the cookies we set", () => {
     expect(html).toContain("__Host-bb_session");
+    expect(html).toContain("__Secure-bb.session_token");
+  });
+
+  it("explains accounts: what's stored, who delivers alerts, and how to delete it", () => {
+    expect(html).toContain("Accounts and alerts (optional)");
+    expect(html).toContain("https://resend.com/legal/privacy-policy");
+    expect(html).toContain("180 days");
+    expect(html).toContain("Delete account");
+    expect(html).toContain("encrypted for your device");
   });
 
   it("never uses inline style attributes (CSP forbids them)", () => {

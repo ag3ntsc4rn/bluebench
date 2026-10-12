@@ -49,4 +49,16 @@ describe("App", () => {
     expect(html).toMatch(/aria-current="page"[^>]*>.*?<span>Domains<\/span>/);
     expect(renderToString(<App />)).toContain('href="/domain-checker"'); // footer link
   });
+
+  it("gives the Alerts tab its own page at /alerts", () => {
+    const html = renderToString(<App initialPath="/alerts" />);
+    expect(html).toContain('id="alerts-heading"');
+    expect(html).toMatch(/aria-current="page"[^>]*>.*?<span>Alerts<\/span>/);
+  });
+
+  it("serves the magic-link landing page at /signin, outside the tabs", () => {
+    const html = renderToString(<App initialPath="/signin" />);
+    expect(html).toContain('id="signin-heading"');
+    expect(html).not.toContain('aria-current="page"');
+  });
 });

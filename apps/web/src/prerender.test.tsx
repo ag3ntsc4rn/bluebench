@@ -12,7 +12,7 @@ const byFile = Object.fromEntries(pages.map((p) => [p.file, p.html]));
 describe("prerender", () => {
   it("writes one file per route plus a 404 page", () => {
     expect(Object.keys(byFile).sort()).toEqual(
-      ["index.html", "privacy.html", "domain-checker.html", "404.html", ...TOOLS.map((t) => `${t.slug}.html`)].sort(),
+      ["index.html", "privacy.html", "domain-checker.html", "alerts.html", "signin.html", "404.html", ...TOOLS.map((t) => `${t.slug}.html`)].sort(),
     );
   });
 
@@ -38,6 +38,13 @@ describe("prerender", () => {
     expect(xml).toContain("<loc>https://bluebench.dev/</loc>");
     expect(xml).toContain("<loc>https://bluebench.dev/url-decoder</loc>");
     expect(xml).not.toContain("404");
+  });
+
+  it("keeps the magic-link landing page out of search, and the alerts page in", () => {
+    expect(byFile["signin.html"]).toContain('<meta name="robots" content="noindex" />');
+    const xml = sitemap(pages);
+    expect(xml).not.toContain("/signin");
+    expect(xml).toContain("<loc>https://bluebench.dev/alerts</loc>");
   });
 
   it("never emits inline style attributes (CSP forbids them)", () => {

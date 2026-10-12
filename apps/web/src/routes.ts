@@ -215,6 +215,21 @@ export const DOMAINS: ContentPage = {
   ],
 };
 
+/** The Alerts tab: domain monitoring, notifications and the account. */
+export const ALERTS: PageMeta = {
+  path: "/alerts",
+  title: "Domain monitoring alerts: grade drops and certificate expiry | Bluebench",
+  description:
+    "Free daily monitoring for up to 5 domains you control: push or email alerts when a security grade drops or a certificate is about to expire.",
+};
+
+/** Where magic links land. Not indexed. */
+export const SIGNIN: PageMeta = {
+  path: "/signin",
+  title: "Sign in | Bluebench",
+  description: "Finish signing in to Bluebench with the one-time link from your email. No password needed, ever.",
+};
+
 export const PRIVACY: PageMeta = {
   path: "/privacy",
   title: "Privacy | Bluebench",
@@ -231,6 +246,8 @@ export type Page =
   | { kind: "home" }
   | { kind: "privacy" }
   | { kind: "domains" }
+  | { kind: "alerts" }
+  | { kind: "signin" }
   | { kind: "tool"; tool: ToolRoute }
   | { kind: "notfound" };
 
@@ -239,6 +256,8 @@ export function pageForPath(path: string): Page {
   if (p === "/") return { kind: "home" };
   if (p === PRIVACY.path) return { kind: "privacy" };
   if (p === DOMAINS.path) return { kind: "domains" };
+  if (p === ALERTS.path) return { kind: "alerts" };
+  if (p === SIGNIN.path) return { kind: "signin" };
   const tool = TOOLS.find((t) => t.path === p);
   return tool ? { kind: "tool", tool } : { kind: "notfound" };
 }
@@ -251,6 +270,10 @@ export function metaFor(page: Page): PageMeta {
       return PRIVACY;
     case "domains":
       return DOMAINS;
+    case "alerts":
+      return ALERTS;
+    case "signin":
+      return SIGNIN;
     case "tool":
       return page.tool;
     case "notfound":

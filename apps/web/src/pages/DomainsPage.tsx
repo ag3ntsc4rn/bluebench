@@ -1,5 +1,6 @@
 import { CHECK_LABELS, type ApiError, type CheckStatus, type DomainCheck, type DomainReport, type Grade } from "@bluebench/shared";
 import { useRef, useState, type FormEvent } from "react";
+import { MyDomains } from "../components/MyDomains";
 import { Badge, CopyButton, Facts, type Tone } from "../components/ui";
 import { checkDomain } from "../lib/api";
 import { domainFromInput } from "../lib/domain-input";
@@ -99,14 +100,25 @@ export function DomainsPage({
   const [input, setInput] = useState("");
   const [state, setState] = useState<State>({ phase: "idle" });
   const challengeRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const domain = domainFromInput(input);
 
-  const run = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!domain) return;
+  const check = async (target: string) => {
     setState({ phase: "loading" });
-    const res = await checkDomain(domain, (siteKey) => runTurnstile(challengeRef.current!, siteKey));
+    const res = await checkDomain(target, (siteKey) => runTurnstile(challengeRef.current!, siteKey));
     setState(res.ok ? { phase: "done", report: res } : { phase: "error", error: res });
+  };
+
+  const run = (e: FormEvent) => {
+    e.preventDefault();
+    if (domain) void check(domain);
+  };
+
+  /** "Check now" on a saved domain: fill in the checker, run it and bring it into view. */
+  const checkSaved = (target: string) => {
+    setInput(target);
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    void check(target);
   };
 
   return (
@@ -117,7 +129,7 @@ export function DomainsPage({
         </h1>
         <p className="mt-1 text-muted">{lead}</p>
       </div>
-      <form onSubmit={(e) => void run(e)} className="space-y-3 rounded-lg border border-border bg-surface p-4">
+      <form ref={formRef} onSubmit={run} className="scroll-mt-4 space-y-3 rounded-lg border border-border bg-surface p-4">
         <label htmlFor="domain" className="block text-sm font-medium">
           Domain
         </label>
@@ -160,6 +172,7 @@ export function DomainsPage({
         )}
         {state.phase === "done" && <DomainReportView report={state.report} />}
       </div>
+      <MyDomains onCheck={checkSaved} />
     </section>
   );
 }

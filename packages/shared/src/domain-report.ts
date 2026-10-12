@@ -57,6 +57,8 @@ export interface DomainReport {
   checkedAt: string;
   /** True when served from the 1-hour report cache. */
   cached?: boolean;
+  /** The newest unexpired certificate on record, when crt.sh answered. Dates as crt.sh gives them (UTC). */
+  certificate?: { issuer: string; notBefore: string; notAfter: string };
 }
 
 /** Points per check. Ungraded checks (info, skipped) drop out of the total. */
