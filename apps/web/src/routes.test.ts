@@ -1,7 +1,7 @@
 import { detect } from "@bluebench/shared";
 import { describe, expect, it } from "vitest";
 import { decodeJwt } from "./lib/jwt";
-import { ALERTS, DOMAINS, HOME, pageForPath, PRIVACY, SIGNIN, TOOLS } from "./routes";
+import { ABOUT, ALERTS, DOMAINS, HOME, pageForPath, PRIVACY, SETTINGS, SIGNIN, TOOLS } from "./routes";
 
 const EXPECTED_KIND = {
   "ioc-lookup": "url",
@@ -25,7 +25,7 @@ describe("routes", () => {
   });
 
   it("every page has a unique path and title, and a search-friendly description", () => {
-    const pages = [HOME, PRIVACY, DOMAINS, ALERTS, SIGNIN, ...TOOLS];
+    const pages = [HOME, PRIVACY, ABOUT, SETTINGS, DOMAINS, ALERTS, SIGNIN, ...TOOLS];
     expect(new Set(pages.map((p) => p.path)).size).toBe(pages.length);
     expect(new Set(pages.map((p) => p.title)).size).toBe(pages.length);
     for (const p of pages) {
@@ -42,6 +42,8 @@ describe("routes", () => {
     expect(pageForPath("/domain-checker")).toEqual({ kind: "domains" });
     expect(pageForPath("/alerts")).toEqual({ kind: "alerts" });
     expect(pageForPath("/signin")).toEqual({ kind: "signin" });
+    expect(pageForPath("/about")).toEqual({ kind: "about" });
+    expect(pageForPath("/settings/")).toEqual({ kind: "settings" });
     expect(pageForPath("/wp-admin")).toEqual({ kind: "notfound" });
   });
 });

@@ -1,18 +1,20 @@
 import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
-import { Nav } from "./components/Nav";
+import { Nav, SettingsIcon } from "./components/Nav";
 import { UpdateBanner } from "./components/UpdateBanner";
+import { AboutPage } from "./pages/AboutPage";
 import { AlertsPage } from "./pages/AlertsPage";
 import { DomainsPage } from "./pages/DomainsPage";
 import { LookupPage } from "./pages/LookupPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
+import { SettingsPage } from "./pages/SettingsPage";
 import { SignInPage } from "./pages/SignInPage";
 import { Explainer, ToolPage } from "./pages/ToolPage";
-import { DOMAINS, metaFor, pageForPath, pathOf, TOOLS, type Page } from "./routes";
+import { DOMAINS, DONATE_URL, metaFor, pageForPath, pathOf, SOURCE_URL, TOOLS, type Page } from "./routes";
 import { TABS, type TabId } from "./tabs";
 
-// Tool pages belong to the Lookup tab, the domain checker to Domains; Privacy, sign-in and 404 to none.
+// Tool pages belong to the Lookup tab, the domain checker to Domains; Privacy, About, Settings, sign-in and 404 to none.
 const TAB_OF: Partial<Record<Page["kind"], TabId>> = { tool: "lookup", domains: "domains", alerts: "alerts" };
 
 const currentPath = () => (typeof location === "undefined" ? "/" : location.pathname);
@@ -56,6 +58,8 @@ export function App({ initialTab = "lookup", initialPath }: { initialTab?: TabId
 
   let content: ReactNode;
   if (page.kind === "privacy") content = <PrivacyPage />;
+  else if (page.kind === "about") content = <AboutPage />;
+  else if (page.kind === "settings") content = <SettingsPage />;
   else if (page.kind === "domains")
     content = (
       <div className="space-y-8">
@@ -77,10 +81,23 @@ export function App({ initialTab = "lookup", initialPath }: { initialTab?: TabId
   return (
     <div className="min-h-dvh md:pl-60">
       <UpdateBanner />
-      <header className="flex items-center border-b border-border px-4 py-3 md:hidden">
+      <header className="flex items-center justify-between border-b border-border py-1 pl-4 pr-1 md:hidden">
         <p className="text-lg font-semibold tracking-tight">
           <span className="text-accent">Blue</span>bench
         </p>
+        <a
+          href={pathOf({ kind: "settings" })}
+          aria-label="Settings"
+          aria-current={page.kind === "settings" ? "page" : undefined}
+          onClick={(e) => {
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+            e.preventDefault();
+            go({ kind: "settings" });
+          }}
+          className={["flex size-11 items-center justify-center rounded-md", page.kind === "settings" ? "text-accent" : "text-muted hover:text-fg"].join(" ")}
+        >
+          <SettingsIcon />
+        </a>
       </header>
       <main className="mx-auto max-w-3xl px-4 pt-6 pb-28 md:px-8 md:pt-10 md:pb-10">
         {content}
@@ -98,13 +115,25 @@ export function App({ initialTab = "lookup", initialPath }: { initialTab?: TabId
             </ul>
           </nav>
           <p className="flex flex-wrap items-center gap-x-4">
+            <Link to={{ kind: "about" }}>About</Link>
             <Link to={{ kind: "privacy" }}>Privacy</Link>
-            <span>Free and open source. Nothing you paste is logged.</span>
+            <Link to={{ kind: "settings" }}>Settings</Link>
+            <a href={SOURCE_URL} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center underline hover:text-fg">
+              Source code
+            </a>
+            {DONATE_URL && (
+              <a href={DONATE_URL} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center underline hover:text-fg">
+                Donate
+              </a>
+            )}
           </p>
+          <p>Free and open source. Nothing you paste is logged.</p>
         </footer>
       </main>
       <Nav
         active={navActive}
+        settingsActive={page.kind === "settings"}
+        onSettings={() => go({ kind: "settings" })}
         onSelect={(id) => {
           setActive(id);
           go(id === "domains" ? { kind: "domains" } : id === "alerts" ? { kind: "alerts" } : { kind: "home" });
