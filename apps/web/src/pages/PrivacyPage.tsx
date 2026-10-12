@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 export const PRIVACY_CONTACT = "privacy@bluebench.dev";
-export const PRIVACY_UPDATED = "11 October 2026";
+export const PRIVACY_UPDATED = "12 October 2026";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -48,8 +48,8 @@ export function PrivacyPage() {
 
       <Section title="Accounts and alerts (optional)">
         <p>
-          You only need an account to save domains and get alerts about them. Signing in works with a one-time link sent to
-          your email address; there's no password. If you have an account, we store:
+          You only need an account to save domains and get alerts about them. Signing in works with a one-time link or code sent
+          to your email address; there's no password. If you have an account, we store:
         </p>
         <ul className="list-disc space-y-2 pl-5">
           <li>
@@ -69,8 +69,8 @@ export function PrivacyPage() {
           </li>
           <li>
             <strong>Your sign-in session</strong>: a random token that lasts 30 days, renewed while you use it. We don't store
-            your IP address or browser details with it. Sign-in links work once, expire after 15 minutes, and are stored
-            only as a one-way hash.
+            your IP address or browser details with it. Sign-in links and codes work once, expire after 15 minutes, and are
+            stored only as a one-way hash. A code stops working after 3 wrong tries.
           </li>
         </ul>
         <p>
@@ -82,7 +82,7 @@ export function PrivacyPage() {
           the same domain check described below on it once a day, and compares the result with the day before.
         </p>
         <p>
-          <strong>Who helps deliver alerts.</strong> Emails (sign-in links, and alerts when push isn't available) are sent
+          <strong>Who helps deliver alerts.</strong> Emails (sign-in links and codes, and alerts when push isn't available) are sent
           through Resend, which receives your address and the email's text (
           <Ext href="https://resend.com/legal/privacy-policy">Resend's privacy policy</Ext>). Push notifications travel
           through your browser's push service (Google for Chrome and Android, Mozilla for Firefox, Apple for Safari,

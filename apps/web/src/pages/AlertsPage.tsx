@@ -30,7 +30,7 @@ function Note({ tone = "neutral", label, children }: { tone?: Tone; label: strin
 }
 
 const PUSH_HELP: Record<Exclude<PushSupport, "supported">, string> = {
-  "install-first": "On iPhone and iPad, push works once Bluebench is on your home screen: tap Share, then Add to Home Screen, and open it from there.",
+  "install-first": "On iPhone and iPad, push works once Bluebench is on your home screen: tap Share, then Add to Home Screen, and open it from there. Sign in inside the app with the 6-digit code from the email (email links open in Safari, not the app).",
   unsupported: "This browser doesn't support push notifications, so alerts come by email.",
   denied: "Notifications are blocked for this site. Allow them in your browser's site settings to get push alerts here.",
 };
