@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../src/auth.ts";
 import { alert, domain, pushSubscription, session, user, verification } from "../src/db/schema.ts";
 import worker from "../src/index.ts";
-import { BASE, anonSession, call, cookieFrom, freshEmail, freshIp, mockServices, signIn } from "./account.ts";
+import { BASE, anonSession, call, codeFrom, cookieFrom, freshEmail, freshIp, mockServices, signIn } from "./account.ts";
 import { goodDomain } from "./net.ts";
 
 afterEach(() => vi.restoreAllMocks());
@@ -74,6 +74,63 @@ describe("magic-link sign-in", () => {
     const again = await call("POST", "/api/signin/verify", { body: { token }, ip: freshIp() });
     expect(again.status).toBe(400);
     expect((await json<ApiError>(again)).message).toContain("expired or was already used");
+  });
+
+  describe("with the 6-digit code (for the home-screen app)", () => {
+    async function requestEmail(mails: { text: string }[], email: string) {
+      const ip = freshIp();
+      const res = await call("POST", "/api/signin", { body: { email }, cookie: await anonSession(ip), ip });
+      expect(res.status).toBe(200);
+      return codeFrom(mails.at(-1)! as never)!;
+    }
+    const tryCode = (email: string, code: string) => call("POST", "/api/signin/code", { body: { email, code }, ip: freshIp() });
+
+    it("puts a code in the same email as the link, and signs in with it once", async () => {
+      const { mails } = mockServices();
+      const email = freshEmail();
+      const code = await requestEmail(mails, email);
+      expect(code).toMatch(/^\d{6}$/);
+      expect(mails).toHaveLength(1);
+      expect(mails[0]!.text).toContain("/signin#token=");
+
+      // Stored hashed, never as the code itself.
+      const stored = await db(env).select().from(verification).where(eq(verification.identifier, `sign-in-otp-${email}`));
+      expect(stored).toHaveLength(1);
+      expect(stored[0]!.value).not.toContain(code);
+
+      const res = await tryCode(email.toUpperCase(), code);
+      expect(res.status).toBe(200);
+      const cookie = cookieFrom(res, "__Secure-bb.session_token")!;
+      expect(await json<Me>(await call("GET", "/api/me", { cookie }))).toMatchObject({ signedIn: true, email });
+      expect((await tryCode(email, code)).status).toBe(400); // used up
+    });
+
+    it("stops working after 3 wrong tries", async () => {
+      const { mails } = mockServices();
+      const email = freshEmail();
+      const code = await requestEmail(mails, email);
+      const wrong = code === "000000" ? "111111" : "000000";
+      for (let i = 0; i < 3; i++) expect((await tryCode(email, wrong)).status).toBe(400);
+      const res = await tryCode(email, code);
+      expect(res.status).toBe(400);
+      expect((await json<ApiError>(res)).message).toContain("3 wrong tries");
+    });
+
+    it("keeps only the newest code, while the link from the older email still works", async () => {
+      const { mails } = mockServices();
+      const email = freshEmail();
+      const first = await requestEmail(mails, email);
+      const firstLink = /#token=([A-Za-z0-9_-]+)/.exec(mails[0]!.text)![1]!;
+      const second = await requestEmail(mails, email);
+      if (first !== second) expect((await tryCode(email, first)).status).toBe(400);
+      expect((await call("POST", "/api/signin/verify", { body: { token: firstLink }, ip: freshIp() })).status).toBe(200);
+    });
+
+    it("refuses anything that isn't 6 digits", async () => {
+      mockServices();
+      expect((await tryCode(freshEmail(), "12345")).status).toBe(400);
+      expect((await tryCode(freshEmail(), "abcdef")).status).toBe(400);
+    });
   });
 
   it("signs an existing account back in rather than creating another", async () => {

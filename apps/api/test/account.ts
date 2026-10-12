@@ -52,6 +52,8 @@ export function mockServices(net: FakeNet = {}, opts: { pushStatus?: number; res
   return { mails, pushes, calls };
 }
 
+export const codeFrom = (mail: SentMail) => /^(\d{6})$/m.exec(mail.text)?.[1];
+
 export const tokenFrom = (mail: SentMail) => /\/signin#token=([A-Za-z0-9_-]+)/.exec(mail.text)?.[1];
 
 export function cookieFrom(res: Response, name: string): string | undefined {
