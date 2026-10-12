@@ -1,6 +1,6 @@
 import type { ApiError } from "@bluebench/shared";
-import { useId, useRef, useState, type FormEvent } from "react";
-import { finishSignInWithCode, requestSignIn } from "../lib/account";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { clearPendingSignIn, finishSignInWithCode, pendingSignIn, rememberPendingSignIn, requestSignIn } from "../lib/account";
 import { runTurnstile } from "../lib/turnstile";
 import { Badge } from "./ui";
 
@@ -82,17 +82,33 @@ export function SignInForm({ lead }: { lead?: string }) {
   const challengeRef = useRef<HTMLDivElement>(null);
   const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
+  // Back from Mail after iOS reloaded the app: pick up where we left off.
+  useEffect(() => {
+    const pending = pendingSignIn();
+    if (pending) setState({ phase: "sent", email: pending });
+  }, []);
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!valid) return;
     setState({ phase: "sending" });
     const address = email.trim();
     const res = await requestSignIn(address, (siteKey) => runTurnstile(challengeRef.current!, siteKey));
+    if (res.ok) rememberPendingSignIn(address);
     setState(res.ok ? { phase: "sent", email: address } : { phase: "error", error: res });
   };
 
   if (state.phase === "sent") {
-    return <CodeEntry email={state.email} onRetry={() => setState({ phase: "idle" })} />;
+    return (
+      <CodeEntry
+        email={state.email}
+        onRetry={() => {
+          clearPendingSignIn();
+          setEmail(state.email);
+          setState({ phase: "idle" });
+        }}
+      />
+    );
   }
 
   return (
@@ -112,13 +128,20 @@ export function SignInForm({ lead }: { lead?: string }) {
         onChange={(e) => setEmail(e.target.value.slice(0, 254))}
         className="min-h-11 w-full rounded-md border border-border bg-ground px-3 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none"
       />
-      <button
-        type="submit"
-        disabled={!valid || state.phase === "sending"}
-        className="min-h-11 rounded-md bg-accent px-4 text-sm font-medium text-on-accent disabled:opacity-50"
-      >
-        {state.phase === "sending" ? "Sending…" : "Email me a sign-in link"}
-      </button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="submit"
+          disabled={!valid || state.phase === "sending"}
+          className="min-h-11 rounded-md bg-accent px-4 text-sm font-medium text-on-accent disabled:opacity-50"
+        >
+          {state.phase === "sending" ? "Sending…" : "Email me a sign-in link"}
+        </button>
+        {valid && (
+          <button type="button" onClick={() => setState({ phase: "sent", email: email.trim() })} className="min-h-11 text-sm text-muted underline hover:text-fg">
+            I already have a code
+          </button>
+        )}
+      </div>
       <p className="text-xs text-muted">No password. We use your address only for sign-in links and the alerts you ask for.</p>
       {state.phase === "error" && (
         <p aria-live="polite" className="flex items-start gap-2 text-sm">
