@@ -11,12 +11,13 @@ export interface ProviderLimits {
   perDay: number;
 }
 
-/** Everything with a ProviderQuota instance: the lookup sources, plus crt.sh for domain reports. */
-export type QuotaKey = SourceId | "crtsh";
+/** Everything with a ProviderQuota instance: the lookup sources, plus the CT search services for domain reports. */
+export type QuotaKey = SourceId | "crtsh" | "certspotter";
 
 /**
  * Kept well inside each provider's terms: abuse.ch asks for modest volume; Safe Browsing's default
  * quota is 10k/day; crt.sh publishes no limit but asks for restraint (~5/min), and results are cached 24 h.
+ * Cert Spotter (only when crt.sh fails) limits queries per hour; one permit covers a check's few pages.
  */
 export const PROVIDER_LIMITS: Readonly<Record<QuotaKey, ProviderLimits>> = {
   urlhaus: { perMinute: 30, perDay: 3000 },
@@ -24,6 +25,7 @@ export const PROVIDER_LIMITS: Readonly<Record<QuotaKey, ProviderLimits>> = {
   malwarebazaar: { perMinute: 30, perDay: 3000 },
   safebrowsing: { perMinute: 60, perDay: 8000 },
   crtsh: { perMinute: 5, perDay: 1000 },
+  certspotter: { perMinute: 1, perDay: 500 },
 };
 
 /** Anonymous traffic may spend at most this share of a provider's daily budget. */

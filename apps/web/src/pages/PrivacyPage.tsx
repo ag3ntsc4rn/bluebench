@@ -151,7 +151,8 @@ export function PrivacyPage() {
           </li>
           <li>
             looks up the domain's certificates on crt.sh, run by Sectigo (
-            <Ext href="https://www.sectigo.com/privacy-policy">Sectigo's privacy policy</Ext>).
+            <Ext href="https://www.sectigo.com/privacy-policy">Sectigo's privacy policy</Ext>), or, when crt.sh is down, on
+            SSLMate's Cert Spotter (<Ext href="https://sslmate.com/policies/privacy">SSLMate's privacy policy</Ext>).
           </li>
         </ul>
         <p>It never scans ports or crawls beyond the home page.</p>
@@ -166,7 +167,7 @@ export function PrivacyPage() {
           </li>
           <li>
             <strong>Domain reports</strong>: kept for an hour, and certificate results for a day, so repeat checks don't hit
-            the site or crt.sh again. They're filed under a one-way hash, and the domain name is removed from what's stored.
+            the site or the certificate services again. They're filed under a one-way hash, and the domain name is removed from what's stored.
           </li>
           <li>
             <strong>Daily counters</strong> for lookups, domain checks and sign-in emails, for fair-use limits: a count per

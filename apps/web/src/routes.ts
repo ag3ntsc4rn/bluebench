@@ -213,7 +213,7 @@ export const DOMAINS: ContentPage = {
     {
       heading: "How it works",
       paragraphs: [
-        "Bluebench reads the domain's public DNS through Cloudflare's 1.1.1.1, requests the site's home page over HTTPS and plain HTTP (following at most 3 redirects, identifying itself as Bluebench), and looks up certificates on crt.sh. It never scans ports or crawls beyond the home page. Reports are cached for an hour.",
+        "Bluebench reads the domain's public DNS through Cloudflare's 1.1.1.1, requests the site's home page over HTTPS and plain HTTP (following at most 3 redirects, identifying itself as Bluebench), and looks up certificates on crt.sh (or SSLMate's Cert Spotter when crt.sh is down). It never scans ports or crawls beyond the home page. Reports are cached for an hour.",
       ],
     },
   ],
