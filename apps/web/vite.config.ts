@@ -87,8 +87,21 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
-        // API responses must never be served from the service worker cache.
+        // Navigations to /api/ are never answered from the cache.
         navigateFallbackDenylist: [/^\/api\//],
+        // The Intel data is public and the same for everyone, so the app shows the copy on the device at once
+        // and refreshes it in the background. No other API response is cached: they're personal or live.
+        runtimeCaching: [
+          {
+            urlPattern: ({ sameOrigin, url }) => sameOrigin && url.pathname === "/api/intel/kev",
+            handler: "StaleWhileRevalidate",
+            options: {
+              cacheName: "intel",
+              expiration: { maxEntries: 5, maxAgeSeconds: 7 * 24 * 3600 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+        ],
         // Push and notification-click handlers for alerts (public/push-sw.js).
         importScripts: ["/push-sw.js"],
       },

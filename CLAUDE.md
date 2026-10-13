@@ -26,7 +26,7 @@ packages/shared   types, indicator detection, validation (zod), used by both
 - Shared package imports use explicit `.ts` extensions, because Vite 8 loads its config through Node's native TS support.
 - `packages/shared` holds pure, runtime-neutral code (detection, refanging, IP classification, domain helpers, base64/text). Its tsconfig adds the `DOM` lib only for web-standard globals (`URL`, `TextDecoder`, `atob`) that browsers, Workers and Node all provide. Browser-only analysers (JWT, URL, email headers) live in `apps/web/src/lib`.
 - Tool UI must not use React `style` props: CSP `style-src 'self'` blocks inline style attributes.
-- PWA updates: `registerType: "prompt"`, registered by `apps/web/src/pwa.ts` with the plain Service Worker API (no workbox-window). It checks for a new version whenever the page becomes visible; it reloads straight away if the paste box is empty, otherwise it shows a Reload bar.
+- PWA updates: `registerType: "prompt"`, registered by `apps/web/src/pwa.ts` with the plain Service Worker API (no workbox-window). It checks for a new version whenever the page becomes visible; it reloads straight away unless something's typed (the paste box or any `input[data-guard-reload]`) or a runbook step is ticked, otherwise it shows a Reload bar. The service worker caches no API responses except the public `/api/intel/kev` data (stale-while-revalidate, `vite.config.ts`).
 - pnpm 12: only deps listed under `allowBuilds` in `pnpm-workspace.yaml` may run install scripts.
 - The Worker entry module (`apps/api/src/index.ts`) may export only handlers and Durable Object classes; workerd refuses to start otherwise. A test enforces this.
 - Lookup API (M3):
