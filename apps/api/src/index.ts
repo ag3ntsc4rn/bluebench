@@ -123,14 +123,16 @@ app.post("/byo", async (c) => {
 });
 
 /**
- * Known exploited vulnerabilities for the Intel tab: the last 90 days by default, or the whole catalogue
- * with ?scope=all. Built twice a day by .github/workflows/intel.yml and served from KV byte-for-byte (no
+ * Known exploited vulnerabilities for the Intel tab: the last 90 days by default, the whole catalogue
+ * with ?scope=all, or just the vendor/product names (watchlist picker) with ?scope=vendors. Built twice a day by .github/workflows/intel.yml and served from KV byte-for-byte (no
  * parsing). Public data, so no session; a per-IP limit stops it being used as a free mirror.
  */
 app.get("/intel/kev", async (c) => {
   if (!(await c.env.IP_LIMITER.limit({ key: `intel:${clientIp(c)}` })).success) return tooFast(c);
-  const scope = c.req.query("scope") === "all" ? "all" : "recent";
-  const body = await c.env.VERDICTS.get(KEV_KV_KEYS[scope], "stream").catch(() => null);
+  const q = c.req.query("scope");
+  const scope = q === "all" || q === "vendors" ? q : "recent";
+  // cacheTtl keeps a copy at the edge: an uncached read of the 1.1 MB catalogue takes seconds.
+  const body = await c.env.VERDICTS.get(KEV_KV_KEYS[scope], { type: "stream", cacheTtl: 300 }).catch(() => null);
   if (!body) return fail(c, 503, { error: "unavailable", message: "The vulnerability list isn't loaded yet. Check back shortly." });
   return new Response(body, { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=900" } });
 });

@@ -8,6 +8,7 @@ import {
   type ByoSourceId,
   type DomainReport,
   type KevResponse,
+  type KevVendorsResponse,
   type KevScope,
   type LookupKind,
   type LookupResponse,
@@ -139,5 +140,8 @@ export async function byoLookup(
 }
 
 /** Known exploited vulnerabilities: the last 90 days, or the whole catalogue. Public: no session needed. */
-export const fetchKev = (scope: KevScope = "recent", fetchImpl: typeof fetch = fetch) =>
+export const fetchKev = (scope: Exclude<KevScope, "vendors"> = "recent", fetchImpl: typeof fetch = fetch) =>
   requestJson<KevResponse>("GET", `/api/intel/kev${scope === "all" ? "?scope=all" : ""}`, undefined, fetchImpl);
+
+/** KEV's vendor and product names (~8 KB), for the watchlist picker. */
+export const fetchKevVendors = (fetchImpl: typeof fetch = fetch) => requestJson<KevVendorsResponse>("GET", "/api/intel/kev?scope=vendors", undefined, fetchImpl);

@@ -1,5 +1,6 @@
-import { MAX_WATCHES, type Me, type Watch } from "@bluebench/shared";
+import { MAX_WATCHES, suggestVendors, type Me, type Watch } from "@bluebench/shared";
 import { useId, useState, type FormEvent } from "react";
+import { fetchKevVendors } from "../lib/api";
 import { AppLink } from "./AppLink";
 import { Badge, Panel } from "./ui";
 
@@ -8,19 +9,19 @@ const ALL = "";
 interface WatchlistProps {
   me: Me | null;
   watches: Watch[] | null;
-  /** KEV's vendors and their products; null until the whole catalogue has loaded. */
-  vendors: { vendor: string; products: string[] }[] | null;
-  /** Ask for the whole catalogue (the picker needs every vendor name). */
-  onNeedVendors: () => void;
   onAdd: (vendor: string, product: string | null) => Promise<string | null>;
   onRemove: (id: string) => Promise<string | null>;
 }
 
 /** Products the account watches: a new known exploited vulnerability in one of them raises an alert. */
-export function Watchlist({ me, watches, vendors, onNeedVendors, onAdd, onRemove }: WatchlistProps) {
+type Vendors = { vendor: string; products: string[] }[];
+type VendorLoad = { phase: "idle" | "loading" } | { phase: "ready"; vendors: Vendors } | { phase: "error"; message: string };
+
+export function Watchlist({ me, watches, onAdd, onRemove }: WatchlistProps) {
   const vendorId = useId();
   const productId = useId();
-  const listId = useId();
+  // Just the names (~8 KB), loaded when the vendor box is first used.
+  const [load, setLoad] = useState<VendorLoad>({ phase: "idle" });
   const [vendor, setVendor] = useState("");
   const [product, setProduct] = useState(ALL);
   const [busy, setBusy] = useState(false);
@@ -41,7 +42,16 @@ export function Watchlist({ me, watches, vendors, onNeedVendors, onAdd, onRemove
     );
   }
 
+  const vendors = load.phase === "ready" ? load.vendors : null;
+  const fetchVendors = () => {
+    setLoad({ phase: "loading" });
+    void fetchKevVendors().then((res) => setLoad(res.ok ? { phase: "ready", vendors: res.vendors } : { phase: "error", message: res.message }));
+  };
+  const loadVendors = () => {
+    if (load.phase === "idle") fetchVendors();
+  };
   const match = vendors?.find((v) => v.vendor.toLowerCase() === vendor.trim().toLowerCase()) ?? null;
+  const suggestions = vendors && !match ? suggestVendors(vendors, vendor) : [];
   const full = (watches?.length ?? 0) >= MAX_WATCHES;
 
   const run = async (fn: () => Promise<string | null>) => {
@@ -102,24 +112,20 @@ export function Watchlist({ me, watches, vendors, onNeedVendors, onAdd, onRemove
             </label>
             <input
               id={vendorId}
-              list={listId}
               autoComplete="off"
               autoCapitalize="off"
               spellCheck={false}
-              placeholder={vendors ? "e.g. Fortinet" : "Loading vendors…"}
+              data-guard-reload
+              placeholder="e.g. Fortinet"
               value={vendor}
-              onFocus={onNeedVendors}
+              onFocus={loadVendors}
               onChange={(e) => {
                 setVendor(e.target.value.slice(0, 100));
                 setProduct(ALL);
+                loadVendors();
               }}
               className="mt-1 min-h-11 w-full rounded-md border border-border bg-ground px-3 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none"
             />
-            <datalist id={listId}>
-              {vendors?.map((v) => (
-                <option key={v.vendor} value={v.vendor} />
-              ))}
-            </datalist>
           </div>
           <div className="min-w-0 flex-1 basis-40">
             <label htmlFor={productId} className="block text-sm">
@@ -147,8 +153,36 @@ export function Watchlist({ me, watches, vendors, onNeedVendors, onAdd, onRemove
       ) : (
         <p className="text-sm text-muted">That's the maximum of {MAX_WATCHES}. Remove one to add another.</p>
       )}
-      {vendor.trim() && vendors && !match && (
-        <p className="text-sm text-muted">Pick a vendor from the list: only names this catalogue uses can match.</p>
+      {suggestions.length > 0 && (
+        <ul aria-label="Matching vendors" className="flex flex-wrap gap-2">
+          {suggestions.map((v) => (
+            <li key={v.vendor}>
+              <button
+                type="button"
+                onClick={() => {
+                  setVendor(v.vendor);
+                  setProduct(ALL);
+                }}
+                className="min-h-11 rounded-full border border-border px-4 text-sm text-muted hover:text-fg"
+              >
+                {v.vendor}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {vendor.trim() && load.phase === "loading" && <p className="text-sm text-muted">Loading vendor names…</p>}
+      {vendor.trim() && vendors && !match && suggestions.length === 0 && (
+        <p className="text-sm text-muted">No vendor by that name in this catalogue. Only names it uses can match.</p>
+      )}
+      {load.phase === "error" && (
+        <p aria-live="polite" className="flex flex-wrap items-center gap-2 text-sm">
+          <Badge tone="warn">Error</Badge>
+          <span>{load.message}</span>
+          <button type="button" onClick={fetchVendors} className="min-h-11 rounded-md border border-border px-3 text-muted hover:text-fg">
+            Try again
+          </button>
+        </p>
       )}
       {error && (
         <p aria-live="polite" className="flex items-start gap-2 text-sm">

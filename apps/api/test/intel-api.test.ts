@@ -46,6 +46,12 @@ describe("GET /api/intel/kev", () => {
     expect(((await all.json()) as KevResponse).entries).toHaveLength(5);
   });
 
+  it("serves the vendor list for the watchlist picker", async () => {
+    await env.VERDICTS.put(KEV_KV_KEYS.vendors, JSON.stringify({ ok: true, updatedAt: "x", vendors: [{ vendor: "Fortinet", products: ["FortiOS"] }] }));
+    const res = (await (await get("/api/intel/kev?scope=vendors")).json()) as { vendors: unknown[] };
+    expect(res.vendors).toEqual([{ vendor: "Fortinet", products: ["FortiOS"] }]);
+  });
+
   it("treats an unknown scope as recent", async () => {
     await env.VERDICTS.put(KEV_KV_KEYS.recent, JSON.stringify(doc(1)));
     expect(((await (await get("/api/intel/kev?scope=../../secrets")).json()) as KevResponse).entries).toHaveLength(1);

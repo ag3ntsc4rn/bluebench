@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildKevDocument, firstAdvisory, KEV_MIN_ENTRIES, kevVendors, matchesKev, parseEpssCsv, plainAction, recentKev, watchMatches, WatchSchema } from "./intel.ts";
+import { buildKevDocument, firstAdvisory, KEV_MIN_ENTRIES, kevVendors, matchesKev, suggestVendors, parseEpssCsv, plainAction, recentKev, watchMatches, WatchSchema } from "./intel.ts";
 
 const raw = (i: number, extra: object = {}) => ({
   cveID: `CVE-2026-${String(10000 + i)}`,
@@ -139,5 +139,15 @@ describe("watchlist matching", () => {
     expect(WatchSchema.safeParse({ vendor: "Fortinet", product: null }).success).toBe(true);
     expect(WatchSchema.safeParse({ vendor: "", product: null }).success).toBe(false);
     expect(WatchSchema.safeParse({ vendor: "Fortinet" }).success).toBe(false);
+  });
+});
+
+describe("suggestVendors", () => {
+  const vendors = ["Apple", "Fortinet", "Fortra", "Microsoft", "SonicWall", "Cisco"].map((vendor) => ({ vendor }));
+  it("offers prefix matches first, then other matches, capped", () => {
+    expect(suggestVendors(vendors, "fort").map((v) => v.vendor)).toEqual(["Fortinet", "Fortra"]);
+    expect(suggestVendors(vendors, "co").map((v) => v.vendor)).toEqual(["Cisco"]);
+    expect(suggestVendors(vendors, "i", 2)).toHaveLength(2);
+    expect(suggestVendors(vendors, "  ")).toEqual([]);
   });
 });
