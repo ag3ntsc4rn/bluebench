@@ -1,4 +1,4 @@
-import { detect } from "@bluebench/shared";
+import { detect, extractIndicators } from "@bluebench/shared";
 import { describe, expect, it } from "vitest";
 import { decodeJwt } from "./lib/jwt";
 import { ABOUT, ALERTS, DOMAINS, HOME, INTEL, pageForPath, PRIVACY, RESPOND, SETTINGS, SIGNIN, TOOLS } from "./routes";
@@ -6,6 +6,7 @@ import { RUNBOOKS } from "./runbooks";
 
 const EXPECTED_KIND = {
   "ioc-lookup": "url",
+  "ioc-extractor": "bulk",
   "jwt-decoder": "jwt",
   "email-header-analyzer": "email-headers",
   "base64-decoder": "base64",
@@ -14,7 +15,11 @@ const EXPECTED_KIND = {
 
 describe("routes", () => {
   it.each(TOOLS.map((t) => [t.slug, t] as const))("%s: example is detected as the right kind", (slug, tool) => {
-    expect(detect(tool.example)[0]?.kind).toBe(EXPECTED_KIND[slug]);
+    if (EXPECTED_KIND[slug] === "bulk") {
+      // The extractor's example: several kinds of indicator, defanged, plus a file name that must be skipped.
+      expect(new Set(extractIndicators(tool.example).map((e) => e.kind))).toEqual(new Set(["url", "domain", "ipv4", "email", "sha256"]));
+      expect(extractIndicators(tool.example).some((e) => e.value.includes("invoice"))).toBe(false);
+    } else expect(detect(tool.example)[0]?.kind).toBe(EXPECTED_KIND[slug]);
   });
 
   it("every tool has its own placeholder", () => {

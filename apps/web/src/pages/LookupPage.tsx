@@ -1,6 +1,7 @@
-import { detect, KIND_LABELS, MAX_PASTE_LENGTH, type Detection, type IndicatorKind } from "@bluebench/shared";
-import { useDeferredValue, useMemo, useRef, useState } from "react";
+import { detect, extractIndicators, KIND_LABELS, MAX_PASTE_LENGTH, type Detection, type IndicatorKind } from "@bluebench/shared";
+import { useDeferredValue, useMemo, useRef, useState, type ReactNode } from "react";
 import { Base64Tool } from "../components/tools/Base64Tool";
+import { BulkTool } from "../components/tools/BulkTool";
 import { HeaderTool } from "../components/tools/HeaderTool";
 import { IndicatorTool } from "../components/tools/IndicatorTool";
 import { JwtTool } from "../components/tools/JwtTool";
@@ -16,6 +17,22 @@ const CHIP_LABELS: Partial<Record<IndicatorKind, string>> = {
   email: "Email address",
   "url-encoded": "URL decode",
 };
+
+function Chip({ pressed, onClick, children }: { pressed: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      onClick={onClick}
+      className={[
+        "min-h-11 rounded-full border px-4 text-sm font-medium",
+        pressed ? "border-accent bg-accent text-on-accent" : "border-border text-muted hover:text-fg",
+      ].join(" ")}
+    >
+      {children}
+    </button>
+  );
+}
 
 function Tool({ detection, onUseAsInput }: { detection: Detection; onUseAsInput: (text: string) => void }) {
   switch (detection.kind) {
@@ -41,7 +58,12 @@ interface LookupPageProps {
   /** Offered via "Try an example" while the box is empty. */
   example?: string;
   placeholder?: string;
+  /** Show "All indicators" first when a paste has any (the IOC extractor page). */
+  preferBulk?: boolean;
 }
+
+/** The "All indicators" chip: every indicator in the paste, extracted in bulk. */
+const BULK = "bulk" as const;
 
 export function LookupPage({
   initialValue = "",
@@ -49,13 +71,18 @@ export function LookupPage({
   lead = "Paste an IP, domain, URL, hash, email address, JWT, base64 or raw email headers.",
   example,
   placeholder = "e.g. 203.0.113.7, example.com, a JWT or email headers",
+  preferBulk = false,
 }: LookupPageProps) {
   const [input, setInput] = useState(initialValue);
-  const [chosen, setChosen] = useState<IndicatorKind | null>(null);
+  const [chosen, setChosen] = useState<IndicatorKind | typeof BULK | null>(null);
   // Keep typing responsive on big pastes; analysis catches up a frame later.
   const deferred = useDeferredValue(input);
   const detections = useMemo(() => detect(deferred), [deferred]);
-  const active = detections.find((d) => d.kind === chosen) ?? detections[0];
+  const extracted = useMemo(() => extractIndicators(deferred), [deferred]);
+  // Offer the bulk view when there's more than one indicator, or one that the single-item detector missed.
+  const bulkAvailable = extracted.length >= 2 || (extracted.length === 1 && detections.length === 0);
+  const bulk = bulkAvailable && (chosen === BULK || ((preferBulk || detections.length === 0) && chosen === null));
+  const active = bulk ? undefined : (detections.find((d) => d.kind === chosen) ?? detections[0]);
   const atLimit = input.length >= MAX_PASTE_LENGTH;
 
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -143,36 +170,34 @@ export function LookupPage({
       </div>
 
       <div ref={resultsRef} tabIndex={-1} aria-label="Results" className="scroll-mt-4 space-y-4 focus:outline-none">
-        {active && (
+        {(active || bulk) && (
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Detected type">
               <span className="text-sm text-muted">Detected:</span>
               {detections.map((d) => (
-                <button
-                  key={d.kind}
-                  type="button"
-                  aria-pressed={d.kind === active.kind}
-                  onClick={() => setChosen(d.kind)}
-                  className={[
-                    "min-h-11 rounded-full border px-4 text-sm font-medium",
-                    d.kind === active.kind ? "border-accent bg-accent text-on-accent" : "border-border text-muted hover:text-fg",
-                  ].join(" ")}
-                >
+                <Chip key={d.kind} pressed={d.kind === active?.kind} onClick={() => setChosen(d.kind)}>
                   {CHIP_LABELS[d.kind] ?? KIND_LABELS[d.kind]}
-                </button>
+                </Chip>
               ))}
+              {bulkAvailable && (
+                <Chip pressed={bulk} onClick={() => setChosen(BULK)}>
+                  All indicators ({extracted.length})
+                </Chip>
+              )}
             </div>
-            {active.refanged && <p className="text-sm text-muted">Defanged input was refanged for analysis.</p>}
+            {active?.refanged && <p className="text-sm text-muted">Defanged input was refanged for analysis.</p>}
           </div>
         )}
 
-        {deferred.trim() && !active && (
+        {deferred.trim() && !active && !bulk && (
           <p className="rounded-lg border border-border bg-surface p-4 text-sm text-muted">
-            Couldn't recognise this. Paste one indicator at a time, or the full headers of an email.
+            Couldn't find anything to analyse. Paste an indicator, a JWT, base64, the full headers of an email, or any text
+            containing IPs, domains, URLs or hashes.
           </p>
         )}
 
         {active && <Tool key={`${active.kind}:${active.value}`} detection={active} onUseAsInput={replaceInput} />}
+        {bulk && <BulkTool items={extracted} onUseAsInput={replaceInput} />}
       </div>
     </section>
   );

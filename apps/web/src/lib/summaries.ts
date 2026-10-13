@@ -41,7 +41,7 @@ export function defangText(text: string): string {
 }
 
 /** email: user@evil.example → user@evil[.]example */
-const defangEmail = (address: string) => {
+export const defangEmail = (address: string) => {
   const at = address.lastIndexOf("@");
   return at < 0 ? defangHost(address) : `${address.slice(0, at)}@${defangHost(address.slice(at + 1))}`;
 };

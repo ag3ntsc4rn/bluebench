@@ -99,7 +99,8 @@ export function PrivacyPage() {
 
       <Section title="What stays in your browser">
         <p>
-          Indicator detection, the JWT, base64 and URL decoders, and the email header analyzer run on your device. What you
+          Indicator detection and bulk extraction (including CSV and STIX exports), the JWT, base64 and URL decoders, and
+          the email header analyzer run on your device. What you
           paste into them is never sent to us or anyone else.
         </p>
         <p>
