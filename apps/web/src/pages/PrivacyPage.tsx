@@ -98,6 +98,10 @@ export function PrivacyPage() {
           Indicator detection, the JWT, base64 and URL decoders, and the email header analyzer run on your device. What you
           paste into them is never sent to us or anyone else.
         </p>
+        <p>
+          The Intel tab loads its list of exploited vulnerabilities from our server. That request carries nothing you've typed:
+          searching the list happens in your browser.
+        </p>
       </Section>
 
       <Section title="Reputation lookups">

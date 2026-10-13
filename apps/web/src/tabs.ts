@@ -1,4 +1,4 @@
-export type TabId = "lookup" | "domains" | "alerts" | "respond";
+export type TabId = "lookup" | "domains" | "alerts" | "respond" | "intel";
 
 export interface Tab {
   id: TabId;
@@ -10,4 +10,5 @@ export const TABS: readonly Tab[] = [
   { id: "domains", label: "Domains" },
   { id: "alerts", label: "Alerts" },
   { id: "respond", label: "Respond" },
+  { id: "intel", label: "Intel" },
 ];

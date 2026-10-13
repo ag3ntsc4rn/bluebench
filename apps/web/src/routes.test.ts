@@ -1,7 +1,7 @@
 import { detect } from "@bluebench/shared";
 import { describe, expect, it } from "vitest";
 import { decodeJwt } from "./lib/jwt";
-import { ABOUT, ALERTS, DOMAINS, HOME, pageForPath, PRIVACY, RESPOND, SETTINGS, SIGNIN, TOOLS } from "./routes";
+import { ABOUT, ALERTS, DOMAINS, HOME, INTEL, pageForPath, PRIVACY, RESPOND, SETTINGS, SIGNIN, TOOLS } from "./routes";
 import { RUNBOOKS } from "./runbooks";
 
 const EXPECTED_KIND = {
@@ -26,7 +26,7 @@ describe("routes", () => {
   });
 
   it("every page has a unique path and title, and a search-friendly description", () => {
-    const pages = [HOME, PRIVACY, ABOUT, SETTINGS, DOMAINS, ALERTS, SIGNIN, RESPOND, ...TOOLS, ...RUNBOOKS];
+    const pages = [HOME, PRIVACY, ABOUT, SETTINGS, DOMAINS, ALERTS, SIGNIN, RESPOND, INTEL, ...TOOLS, ...RUNBOOKS];
     expect(new Set(pages.map((p) => p.path)).size).toBe(pages.length);
     expect(new Set(pages.map((p) => p.title)).size).toBe(pages.length);
     for (const p of pages) {
@@ -45,6 +45,7 @@ describe("routes", () => {
     expect(pageForPath("/signin")).toEqual({ kind: "signin" });
     expect(pageForPath("/about")).toEqual({ kind: "about" });
     expect(pageForPath("/respond")).toEqual({ kind: "respond" });
+    expect(pageForPath("/exploited-vulnerabilities")).toEqual({ kind: "intel" });
     expect(pageForPath("/respond/lost-laptop/")).toMatchObject({ kind: "runbook", runbook: { slug: "lost-laptop" } });
     expect(pageForPath("/respond/nope")).toEqual({ kind: "notfound" });
     expect(pageForPath("/settings/")).toEqual({ kind: "settings" });

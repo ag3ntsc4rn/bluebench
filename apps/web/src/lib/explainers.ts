@@ -32,3 +32,9 @@ export const AUTH_EXPLAINERS: Readonly<Record<AuthMethod, string>> = {
 
 export const HOPS_EXPLAINER =
   "Each mail server that handles a message adds a Received line at the top of the headers, so raw headers read bottom-up (they're shown here oldest first). Only the hops added by your own provider can be trusted: anything before them can be faked by the sender.";
+
+/** Intel tab. */
+export const KEV_EXPLAINER =
+  "CISA's Known Exploited Vulnerabilities catalog lists flaws with reliable evidence that attackers are using them, out of the tens of thousands published each year. US federal agencies must patch them by a deadline; everyone else should treat the list as a patch-first queue.";
+export const EPSS_EXPLAINER =
+  "EPSS, from FIRST, estimates the chance that exploitation of a vulnerability will be seen in the next 30 days, updated daily. It's a probability, not a full risk score: a low number doesn't make a listed flaw safe to ignore.";

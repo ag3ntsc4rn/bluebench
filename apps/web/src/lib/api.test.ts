@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { LookupResponse } from "@bluebench/shared";
-import { byoLookup, lookupReputation } from "./api";
+import { byoLookup, fetchKev, lookupReputation } from "./api";
 
 const OK: LookupResponse = { ok: true, kind: "domain", value: "example.com", verdict: "not-listed", sources: [] };
 
@@ -86,5 +86,17 @@ describe("byoLookup", () => {
     const f = vi.fn();
     expect(await byoLookup("md5", "0".repeat(32), {}, vi.fn(), f as unknown as typeof fetch)).toEqual([]);
     expect(f).not.toHaveBeenCalled();
+  });
+});
+
+describe("fetchKev", () => {
+  it("asks for the recent list by default and the whole catalogue on request, with no body", async () => {
+    const f = vi.fn(async (_path: string, _init?: RequestInit) => Response.json({ ok: true, entries: [] }));
+    await fetchKev("recent", f as unknown as typeof fetch);
+    await fetchKev("all", f as unknown as typeof fetch);
+    expect(f.mock.calls.map((c) => [c[0], c[1]!.method, c[1]!.body])).toEqual([
+      ["/api/intel/kev", "GET", undefined],
+      ["/api/intel/kev?scope=all", "GET", undefined],
+    ]);
   });
 });

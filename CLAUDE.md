@@ -60,13 +60,14 @@ packages/shared   types, indicator detection, validation (zod), used by both
 - Bring-your-own keys (M6): keys live only in the browser's IndexedDB (`apps/web/src/lib/byo-keys.ts`), managed in Settings. Request builders and parsers for all four providers are in `packages/shared/src/byo.ts`. Only OTX allows cross-site calls (it's the one third-party origin in CSP `connect-src`), so the browser asks it directly. VirusTotal, AbuseIPDB and GreyNoise go through `POST /api/byo` (`apps/api/src/byo.ts`): session + per-minute limits but not the daily cap (it spends the user's quota), fixed hosts only (`RELAY_HOSTS`), no redirects, nothing logged, stored or cached. Check reputation runs the shared lookup first (it sets up the session), then the own-key sources; all feed `mergeVerdict`. VirusTotal needs 2+ malicious engines to count as listed, AbuseIPDB a 25 % confidence score, OTX pulses unless OTX validation marks it known good.
 - Settings (`/settings`, noindex) holds the account controls (Sign out, Delete account), own API keys and the support panel; it's in the mobile top bar and under the desktop side nav. About is `/about`. Donate links use `DONATE_URL` in `routes.ts` (GitHub Sponsors; `.github/FUNDING.yml` adds the repo's Sponsor button). `SOURCE_URL` is the GitHub repo.
 - Respond tab: incident runbooks in `apps/web/src/runbooks.ts` (phishing click, compromised email account, ransomware, leaked secret, lost laptop), each with "get help now if…" triggers and five phases (Right now, Contain, Investigate, Recover, Afterwards). Pages are `/respond` and `/respond/<slug>`, pre-rendered as `respond.html` and `respond/<slug>.html`. Checkbox ticks live only in React state (never stored). The PWA won't auto-reload while a step is ticked (`data-runbook-step`). Keep the advice vendor-neutral and conservative; steps link to tools by path, and a test checks those paths exist.
+- Intel tab (`/exploited-vulnerabilities`): CISA KEV (CC0; no CISA logo, no implied endorsement) with FIRST EPSS scores (free, attribution requested, permitted for preventative cybersecurity use). `.github/workflows/intel.yml` runs `apps/api/scripts/update-intel.ts` twice a day: it fetches KEV from CISA's GitHub mirror and EPSS's daily CSV (FIRST asks bulk users not to use the API), builds the document with `buildKevDocument` (shared `intel.ts`; refuses fewer than 1,000 entries so bad data never replaces good), and writes two KV keys (`KEV_KV_KEYS`: last 90 days ≈14 KB and the whole catalogue ≈175 KB compressed). The workflow deploys nothing. `GET /api/intel/kev[?scope=all]` streams the KV value as-is (no parsing in the Worker), is cacheable for 15 min and per-IP limited. CISA's federal "required action" boilerplate is rewritten into plain instructions (`plainAction`). Search runs in the browser on the whole catalogue, fetched only when needed.
 - Routes and SEO: every URL is listed in `apps/web/src/routes.ts`: home, `/privacy`, `/about`, `/respond` and its runbooks, one landing page per tool (`/ioc-lookup`, `/jwt-decoder`, …), `/domain-checker`, `/alerts`, `/signin` and `/settings` (both noindex, not in the sitemap) and the 404 page. The build pre-renders each route to its own HTML file in `dist`, with its own title, description, canonical URL and Open Graph tags, and writes `sitemap.xml` (`prerender()` in `apps/web/vite.config.ts` plus `src/prerender.tsx`). `main.tsx` hydrates that HTML. Assets use `not_found_handling: "404-page"`, so unknown paths get a real 404. To add a page, add it to `routes.ts`. `public/og.png` (the link-preview image) is rendered from `apps/web/scripts/og-image.html`; that file explains how to regenerate it.
 - `public/robots.txt` and `public/.well-known/security.txt` (contact: security@bluebench.dev; renew its `Expires` date before 2027-10-01).
 - The privacy policy lives at `/privacy` (`apps/web/src/pages/PrivacyPage.tsx`), linked from every page's footer. Update it, and its date, **before** shipping any change to what data leaves the browser, is stored, or which third parties see it. It must keep linking Cloudflare's Turnstile Privacy Addendum: that's a condition of the invisible Turnstile widget. Contact: privacy@bluebench.dev (Cloudflare Email Routing).
 - API tests mock upstreams with `vi.spyOn(globalThis, "fetch")` (see `apps/api/test/upstream.ts`); the vitest plugin has no `fetchMock`.
 
 - Database: Cloudflare D1 via Drizzle ORM (users, sessions, domains, alert history, push subscriptions; daily counters stay in the `UsageCounter` DO)
-- Cache: Workers KV for lookup verdicts, TTL 6–24 h (Safe Browsing: obey its cache duration exactly)
+- Cache: Workers KV for lookup verdicts, TTL 6–24 h (Safe Browsing: obey its cache duration exactly), plus the Intel data
 - Quota guard: one Durable Object per upstream provider (token bucket + daily budget)
 - Scheduling: Cron Triggers (daily domain re-checks)
 - Auth: Better Auth, magic link only; email via Resend
@@ -77,7 +78,7 @@ packages/shared   types, indicator detection, validation (zod), used by both
 
 Stay on Cloudflare's free tier. Free-tier limits that shape the design:
 - Workers: 100k requests/day, 10 ms CPU per request
-- KV: **1,000 writes/day** — KV is for cached verdicts only, never counters
+- KV: **1,000 writes/day** — KV is for cached verdicts, domain reports and the Intel data (4 writes/day), never counters
 - D1: 100k rows written/day
 - Resend free: 100 emails/day — prefer push; email for magic links and digests
 
@@ -85,13 +86,13 @@ Ask before adding any dependency outside this list.
 
 ## Design
 
-Match the approved mockup: dark theme, four-tab bottom nav on mobile (side nav on desktop). The fifth tab, Learn, was dropped on 2026-10-12: a standalone glossary or phishing quiz adds little that Cloudflare, NIST or Google don't already do better. Explanations live where terms appear instead ("What's this?" in results, `apps/web/src/lib/explainers.ts`).
+Match the approved mockup: dark theme, five-tab bottom nav on mobile (side nav on desktop). The fifth tab, Learn, was dropped on 2026-10-12: a standalone glossary or phishing quiz adds little that Cloudflare, NIST or Google don't already do better. Explanations live where terms appear instead ("What's this?" in results, `apps/web/src/lib/explainers.ts`).
 
 - Colors: ground `#0E1116`, surface `#171B22`, border `#262C36`, text `#E8EAED`, muted `#9AA3AE`, accent blue `#5B8CFF` (dark text `#050B18` on it, 6.2:1)
 - Status: OK sky blue `#6CB4FF`, warning amber `#F5A524`, critical coral `#FF8A6B`. Always pair color with a text label. The accent is used for actions and brand (filled buttons, active nav, focus rings), the status colours only for outlined labels, so the two blues don't compete.
 - Type: IBM Plex Sans for UI, IBM Plex Mono for indicators, hashes and code
 - Touch targets ≥ 44 px; text contrast ≥ 4.5:1; real `<button>`/`<a>`/`<label>` elements
-- Tabs: **Lookup** (home), **Domains**, **Alerts**, **Respond** (incident runbooks)
+- Tabs: **Lookup** (home), **Domains**, **Alerts**, **Respond** (incident runbooks), **Intel** (exploited vulnerabilities)
 
 ## v1 features
 
@@ -125,6 +126,8 @@ Out of scope for v1: CVE feed, one-time secrets, incident runbook, phishing quiz
 | Google Safe Browsing v4 | Shared, server-side | Never show a verdict past its cache duration; hedge wording ("suspected", "possible"); show "Advisory provided by Google"; state protection isn't perfect |
 | DNS-over-HTTPS (Cloudflare 1.1.1.1) | Shared | — |
 | crt.sh | Shared | ~5 req/min, no published limit; cache hard |
+| CISA KEV | Shared, Intel tab | CC0. Don't use the CISA logo or DHS seal or imply endorsement |
+| FIRST EPSS | Shared, Intel tab | Free, no registration. Attribution requested ("EPSS by FIRST"); use for preventative cybersecurity only; bulk = daily CSV, not the API |
 | SSLMate Cert Spotter | Shared, fallback for crt.sh | API key required for production use (keyless is personal/evaluation only). Free "Small" plan: 100 single-hostname queries/hour; we cap at 90 (`ProviderQuota` counts each page). Terms (sslmate.com/policies/tos, California law) say nothing on caching or display; SSLMate may change or end the free plan without notice |
 | VirusTotal, AbuseIPDB, AlienVault OTX, GreyNoise | **BYO key only** | Call with the user's key; never cache in KV or show to other users |
 

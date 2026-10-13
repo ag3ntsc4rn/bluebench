@@ -251,6 +251,14 @@ export const SETTINGS: PageMeta = {
   description: "Your Bluebench account, the API keys you keep in this browser for VirusTotal, AbuseIPDB, GreyNoise and OTX, and how to support Bluebench.",
 };
 
+/** The Intel tab: actively exploited vulnerabilities (CISA KEV) with EPSS scores. */
+export const INTEL: PageMeta = {
+  path: "/exploited-vulnerabilities",
+  title: "Actively exploited vulnerabilities, updated daily | Bluebench",
+  description:
+    "The vulnerabilities attackers are using right now, from CISA's KEV catalog with EPSS exploit likelihood. Search by vendor or product to see what to patch first.",
+};
+
 /** Where magic links land. Not indexed. */
 export const SIGNIN: PageMeta = {
   path: "/signin",
@@ -275,6 +283,7 @@ export type Page =
   | { kind: "privacy" }
   | { kind: "about" }
   | { kind: "respond" }
+  | { kind: "intel" }
   | { kind: "runbook"; runbook: Runbook }
   | { kind: "settings" }
   | { kind: "domains" }
@@ -289,6 +298,7 @@ export function pageForPath(path: string): Page {
   if (p === PRIVACY.path) return { kind: "privacy" };
   if (p === ABOUT.path) return { kind: "about" };
   if (p === RESPOND.path) return { kind: "respond" };
+  if (p === INTEL.path) return { kind: "intel" };
   const runbook = RUNBOOKS.find((r) => r.path === p);
   if (runbook) return { kind: "runbook", runbook };
   if (p === SETTINGS.path) return { kind: "settings" };
@@ -309,6 +319,8 @@ export function metaFor(page: Page): PageMeta {
       return ABOUT;
     case "respond":
       return RESPOND;
+    case "intel":
+      return INTEL;
     case "runbook":
       return page.runbook;
     case "settings":

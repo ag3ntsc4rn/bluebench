@@ -43,6 +43,10 @@ describe("PrivacyPage", () => {
     expect(html).toContain("passes them on and returns the answer");
   });
 
+  it("says the Intel tab's search stays in the browser", () => {
+    expect(html).toContain("searching the list happens in your browser");
+  });
+
   it("mentions the daily lookalike lookups", () => {
     expect(html).toContain("lookalike");
   });

@@ -5,6 +5,7 @@ const PATHS: Record<TabId, string> = {
   domains: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-9 9h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z",
   alerts: "M6 16V11a6 6 0 1 1 12 0v5l2 2H4l2-2Zm4 4h4",
   respond: "M12 3 4 6v6c0 4.4 3.4 8.2 8 9 4.6-.8 8-4.6 8-9V6l-8-3Zm-3 9 2 2 4-4",
+  intel: "M12 12 18.4 5.6M21 12a9 9 0 1 1-9-9m5 9a5 5 0 1 1-5-5m1 5a1 1 0 1 1-1-1",
 };
 
 export function TabIcon({ id }: { id: TabId }) {
