@@ -23,7 +23,7 @@ export function Explainer({ sections }: { sections: readonly ToolSection[] }) {
 export function ToolPage({ tool }: { tool: ToolRoute }) {
   return (
     <div className="space-y-8">
-      <LookupPage heading={tool.h1} lead={tool.lead} example={tool.example} placeholder={tool.placeholder} />
+      <LookupPage heading={tool.h1} lead={tool.lead} example={tool.example} placeholder={tool.placeholder} preferBulk={tool.preferBulk} />
       <Explainer sections={tool.sections} />
     </div>
   );

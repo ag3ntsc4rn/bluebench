@@ -13,7 +13,7 @@ export const SOURCE_URL = "https://github.com/ag3ntsc4rn/bluebench";
 /** Where donations go. Set to null to hide donate links (pages then say donations open soon). */
 export const DONATE_URL: string | null = "https://github.com/sponsors/ag3ntsc4rn";
 
-export type ToolSlug = "ioc-lookup" | "jwt-decoder" | "email-header-analyzer" | "base64-decoder" | "url-decoder";
+export type ToolSlug = "ioc-lookup" | "ioc-extractor" | "jwt-decoder" | "email-header-analyzer" | "base64-decoder" | "url-decoder";
 
 export interface ToolSection {
   heading: string;
@@ -36,6 +36,8 @@ export interface ToolRoute {
   /** Paste box hint for this tool. */
   placeholder: string;
   sections: ToolSection[];
+  /** Open on the "All indicators" view when the paste has any (the IOC extractor). */
+  preferBulk?: boolean;
 }
 
 const PRIVATE =
@@ -67,6 +69,40 @@ export const TOOLS: readonly ToolRoute[] = [
           "Detection and refanging run in your browser. The indicator is sent only when you press Check reputation, and it isn't logged. Cached results are stored under a one-way hash.",
         ],
       },
+    ],
+  },
+  {
+    slug: "ioc-extractor",
+    path: "/ioc-extractor",
+    name: "IOC extractor",
+    title: "IOC extractor: pull IPs, domains, URLs and hashes from text | Bluebench",
+    description:
+      "Paste a report, email or log and get every IP, domain, URL, email and hash, refanged and de-duplicated. Export as CSV or STIX 2.1. Runs in your browser.",
+    h1: "IOC extractor",
+    lead: "Paste any text with indicators in it and get a clean list, ready to share, block or import.",
+    placeholder: "Paste a threat report, an email, an alert or a log excerpt",
+    preferBulk: true,
+    example: [
+      "Incident note: user clicked hxxps://login-portal[.]top/verify?u=finance",
+      "Payload fetched from 198.51.100.23 and cdn-update[.]xyz (see invoice.pdf).",
+      "Reply-to: billing[@]northwind-pay[.]com",
+      "SHA-256: 3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea",
+    ].join("\n"),
+    sections: [
+      {
+        heading: "What it finds",
+        paragraphs: [
+          "IPv4 and IPv6 addresses, domains, URLs, email addresses and MD5, SHA-1 and SHA-256 hashes, even when they're defanged (hxxp, [.], [@]). Duplicates are merged, and a URL's host isn't listed twice.",
+          "Domains are only kept if they end in a real top-level domain, so file names like invoice.pdf and code like array.pop are skipped. Private and reserved IP addresses are marked.",
+        ],
+      },
+      {
+        heading: "Export",
+        paragraphs: [
+          "Copy a defanged list that's safe to paste into chat or a ticket, download a CSV for spreadsheets (protected against formula injection), or download a STIX 2.1 bundle to import into a threat intelligence platform such as MISP or OpenCTI.",
+        ],
+      },
+      { heading: "Nothing is uploaded", paragraphs: [PRIVATE] },
     ],
   },
   {

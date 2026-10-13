@@ -21,7 +21,29 @@ describe("LookupPage", () => {
   });
 
   it("says when it can't recognise input", () => {
-    expect(text("hello there")).toContain("Couldn't recognise this.");
+    expect(text("hello there")).toContain("Couldn't find anything to analyse.");
+  });
+
+  it("extracts every indicator from a block of text, with exports", () => {
+    const html = text("Seen 198.51.100.7 and evil-cdn[.]xyz, then hxxps://login-portal[.]top/a in invoice.pdf");
+    expect(html).toMatch(/aria-pressed="true"[^>]*>All indicators \(3\)/);
+    expect(html).toContain("Indicators found");
+    expect(html).toContain("Download STIX 2.1");
+    expect(html).toContain("Download CSV");
+    expect(html).toContain("login-portal.top");
+    expect(html).not.toContain("invoice.pdf</span>");
+  });
+
+  it("keeps a single indicator on its own tool, without a bulk chip", () => {
+    const html = text("198.51.100.7");
+    expect(html).not.toContain("All indicators");
+  });
+
+  it("offers the bulk view as a second choice for email headers", () => {
+    const headers = ["Received: from mail.evil.xyz (mail.evil.xyz [198.51.100.9]) by mx.example.org", "From: a@evil.xyz", "To: b@example.org", "Subject: hi"].join("\n");
+    const html = text(headers);
+    expect(html).toMatch(/aria-pressed="true"[^>]*>Email headers/);
+    expect(html).toMatch(/aria-pressed="false"[^>]*>All indicators/);
   });
 
   it("routes an IP to the indicator panel with its range", () => {
