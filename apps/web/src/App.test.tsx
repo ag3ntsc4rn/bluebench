@@ -3,19 +3,19 @@ import { describe, expect, it } from "vitest";
 import { App } from "./App";
 
 describe("App", () => {
-  it("renders the five-tab nav with Lookup active", () => {
+  it("renders the four-tab nav with Lookup active", () => {
     const html = renderToString(<App />);
-    for (const label of ["Lookup", "Domains", "Alerts", "Respond", "Learn"]) {
+    for (const label of ["Lookup", "Domains", "Alerts", "Respond"]) {
       expect(html).toContain(`<span>${label}</span>`);
     }
-    expect(/<nav[\s\S]*<\/nav>/.exec(html)![0].match(/<button/g)).toHaveLength(5);
+    expect(html).not.toContain("<span>Learn</span>");
+    expect(/<nav[\s\S]*<\/nav>/.exec(html)![0].match(/<button/g)).toHaveLength(4);
     expect(html).toMatch(/aria-current="page"[^>]*>.*?<span>Lookup<\/span>/);
     expect(html).toContain('for="paste"');
   });
 
-  it("marks only Learn as coming soon", () => {
-    expect(renderToString(<App initialTab="learn" />)).toContain("Coming soon.");
-    expect(renderToString(<App />).match(/Soon<\/span>/g)).toHaveLength(1);
+  it("has no coming-soon tabs", () => {
+    expect(renderToString(<App />)).not.toMatch(/Soon<\/span>/);
   });
 
   it("serves the Respond tab and each runbook under it", () => {

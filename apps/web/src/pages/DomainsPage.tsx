@@ -1,8 +1,9 @@
 import { CHECK_LABELS, type ApiError, type CheckStatus, type DomainCheck, type DomainReport, type Grade } from "@bluebench/shared";
 import { useRef, useState, type FormEvent } from "react";
 import { MyDomains } from "../components/MyDomains";
-import { Badge, CopyButton, Facts, type Tone } from "../components/ui";
+import { Badge, CopyButton, Facts, WhatsThis, type Tone } from "../components/ui";
 import { checkDomain } from "../lib/api";
+import { CHECK_EXPLAINERS } from "../lib/explainers";
 import { domainFromInput } from "../lib/domain-input";
 import { summarizeDomain } from "../lib/summaries";
 import { runTurnstile } from "../lib/turnstile";
@@ -46,6 +47,7 @@ function CheckRow({ check }: { check: DomainCheck }) {
         </p>
       )}
       {check.facts.length > 0 && <Facts rows={check.facts.map((f) => [f.label, f.value])} />}
+      <WhatsThis>{CHECK_EXPLAINERS[check.id]}</WhatsThis>
     </li>
   );
 }

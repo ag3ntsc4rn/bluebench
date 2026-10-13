@@ -61,6 +61,16 @@ export function FindingList({ findings, empty }: { findings: Finding[]; empty?: 
   );
 }
 
+/** A collapsed "What's this?" explanation next to a term in a result. */
+export function WhatsThis({ children }: { children: ReactNode }) {
+  return (
+    <details className="text-sm">
+      <summary className="inline-flex min-h-11 cursor-pointer items-center text-muted underline hover:text-fg">What's this?</summary>
+      <p className="text-muted">{children}</p>
+    </details>
+  );
+}
+
 export function CopyButton({ value, label = "Copy" }: { value: string; label?: string }) {
   const [copied, setCopied] = useState(false);
   return (
