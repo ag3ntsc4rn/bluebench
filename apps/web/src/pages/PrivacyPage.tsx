@@ -221,7 +221,10 @@ export function PrivacyPage() {
           If you add your own API keys, they're kept in an IndexedDB database named{" "}
           <code className="font-mono text-sm">bluebench</code> in your browser, and nowhere else.
         </p>
-        <p>The app also caches its own files on your device so it works offline and can be installed.</p>
+        <p>
+          The app also caches its own files on your device so it works offline and can be installed, along with the Intel
+          tab's public list of exploited vulnerabilities, so it opens instantly.
+        </p>
       </Section>
 
       <Section title="Questions and requests">

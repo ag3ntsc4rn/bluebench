@@ -1,5 +1,5 @@
 import { MAX_WATCHES, suggestVendors, type Me, type Watch } from "@bluebench/shared";
-import { useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 import { fetchKevVendors } from "../lib/api";
 import { AppLink } from "./AppLink";
 import { Badge, Panel } from "./ui";
@@ -22,6 +22,19 @@ export function Watchlist({ me, watches, onAdd, onRemove }: WatchlistProps) {
   const productId = useId();
   // Just the names (~8 KB), loaded when the vendor box is first used.
   const [load, setLoad] = useState<VendorLoad>({ phase: "idle" });
+  const signedIn = me?.signedIn === true;
+  const fetchVendors = () => {
+    setLoad({ phase: "loading" });
+    void fetchKevVendors().then((res) => setLoad(res.ok ? { phase: "ready", vendors: res.vendors } : { phase: "error", message: res.message }));
+  };
+  const loadVendors = () => {
+    if (load.phase === "idle") fetchVendors();
+  };
+
+  // Fetch the names in the background as soon as the picker can be used, so they're ready on first tap.
+  useEffect(() => {
+    if (signedIn) fetchVendors();
+  }, [signedIn]);
   const [vendor, setVendor] = useState("");
   const [product, setProduct] = useState(ALL);
   const [busy, setBusy] = useState(false);
@@ -43,13 +56,6 @@ export function Watchlist({ me, watches, onAdd, onRemove }: WatchlistProps) {
   }
 
   const vendors = load.phase === "ready" ? load.vendors : null;
-  const fetchVendors = () => {
-    setLoad({ phase: "loading" });
-    void fetchKevVendors().then((res) => setLoad(res.ok ? { phase: "ready", vendors: res.vendors } : { phase: "error", message: res.message }));
-  };
-  const loadVendors = () => {
-    if (load.phase === "idle") fetchVendors();
-  };
   const match = vendors?.find((v) => v.vendor.toLowerCase() === vendor.trim().toLowerCase()) ?? null;
   const suggestions = vendors && !match ? suggestVendors(vendors, vendor) : [];
   const full = (watches?.length ?? 0) >= MAX_WATCHES;
