@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { prerenderPages, sitemap } from "./prerender";
+import { RUNBOOKS } from "./runbooks";
 import { TOOLS } from "./routes";
 
 const TEMPLATE = `<!doctype html><html><head>
@@ -12,7 +13,8 @@ const byFile = Object.fromEntries(pages.map((p) => [p.file, p.html]));
 describe("prerender", () => {
   it("writes one file per route plus a 404 page", () => {
     expect(Object.keys(byFile).sort()).toEqual(
-      ["index.html", "privacy.html", "about.html", "settings.html", "domain-checker.html", "alerts.html", "signin.html", "404.html", ...TOOLS.map((t) => `${t.slug}.html`)].sort(),
+      ["index.html", "privacy.html", "about.html", "settings.html", "domain-checker.html", "alerts.html", "respond.html", "signin.html", "404.html",
+        ...RUNBOOKS.map((r) => `respond/${r.slug}.html`), ...TOOLS.map((t) => `${t.slug}.html`)].sort(),
     );
   });
 
@@ -48,6 +50,7 @@ describe("prerender", () => {
     expect(xml).not.toContain("/settings");
     expect(xml).toContain("<loc>https://bluebench.dev/alerts</loc>");
     expect(xml).toContain("<loc>https://bluebench.dev/about</loc>");
+    expect(xml).toContain("<loc>https://bluebench.dev/respond/ransomware</loc>");
   });
 
   it("never emits inline style attributes (CSP forbids them)", () => {

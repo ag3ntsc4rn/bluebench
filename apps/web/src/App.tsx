@@ -8,6 +8,8 @@ import { LookupPage } from "./pages/LookupPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
+import { RespondPage } from "./pages/RespondPage";
+import { RunbookPage } from "./pages/RunbookPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SignInPage } from "./pages/SignInPage";
 import { Explainer, ToolPage } from "./pages/ToolPage";
@@ -15,7 +17,7 @@ import { DOMAINS, DONATE_URL, metaFor, pageForPath, pathOf, SOURCE_URL, TOOLS, t
 import { TABS, type TabId } from "./tabs";
 
 // Tool pages belong to the Lookup tab, the domain checker to Domains; Privacy, About, Settings, sign-in and 404 to none.
-const TAB_OF: Partial<Record<Page["kind"], TabId>> = { tool: "lookup", domains: "domains", alerts: "alerts" };
+const TAB_OF: Partial<Record<Page["kind"], TabId>> = { tool: "lookup", domains: "domains", alerts: "alerts", respond: "respond", runbook: "respond" };
 
 const currentPath = () => (typeof location === "undefined" ? "/" : location.pathname);
 
@@ -60,6 +62,8 @@ export function App({ initialTab = "lookup", initialPath }: { initialTab?: TabId
   if (page.kind === "privacy") content = <PrivacyPage />;
   else if (page.kind === "about") content = <AboutPage />;
   else if (page.kind === "settings") content = <SettingsPage />;
+  else if (page.kind === "respond") content = <RespondPage />;
+  else if (page.kind === "runbook") content = <RunbookPage key={page.runbook.slug} runbook={page.runbook} />;
   else if (page.kind === "domains")
     content = (
       <div className="space-y-8">
@@ -74,6 +78,7 @@ export function App({ initialTab = "lookup", initialPath }: { initialTab?: TabId
   else if (tab.id === "lookup") content = <LookupPage />;
   else if (tab.id === "domains") content = <DomainsPage />;
   else if (tab.id === "alerts") content = <AlertsPage />;
+  else if (tab.id === "respond") content = <RespondPage />;
   else content = <PlaceholderPage title={tab.label} comingSoon={tab.comingSoon} />;
 
   const navActive = page.kind === "home" ? active : (TAB_OF[page.kind] ?? null);
@@ -136,7 +141,7 @@ export function App({ initialTab = "lookup", initialPath }: { initialTab?: TabId
         onSettings={() => go({ kind: "settings" })}
         onSelect={(id) => {
           setActive(id);
-          go(id === "domains" ? { kind: "domains" } : id === "alerts" ? { kind: "alerts" } : { kind: "home" });
+          go(id === "domains" ? { kind: "domains" } : id === "alerts" ? { kind: "alerts" } : id === "respond" ? { kind: "respond" } : { kind: "home" });
         }}
       />
     </div>
