@@ -32,6 +32,8 @@ export interface Env {
   BETTER_AUTH_SECRET?: string;
   /** Resend API key for magic links and alert emails. Missing = accounts switched off (no way to sign in). */
   RESEND_API_KEY?: string;
+  /** The owner's account email: watchdog alerts go to the account with this address. Missing = no watchdog alerts. */
+  OWNER_EMAIL?: string;
   /** SSLMate Cert Spotter API key: the certificate check's fallback when crt.sh fails. Missing = crt.sh only. */
   CERTSPOTTER_API_KEY?: string;
   /** Web Push VAPID private key (base64url, 32 bytes). */

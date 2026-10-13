@@ -17,15 +17,18 @@ import {
   type ByoResponse,
   type DomainReport,
   type HealthResponse,
+  type StatusResponse,
   type LookupResponse,
 } from "@bluebench/shared";
 import { account } from "./account.ts";
+import { accountsEnabled, db } from "./auth.ts";
 import { relay } from "./byo.ts";
 import type { Env } from "./env.ts";
 import { domainReport, hasCachedReport } from "./domain/report.ts";
 import { admit, challenge, chargeDaily, chargeDailyUpTo, clientIp, dailyLimitMessage, fail, notConfigured, readJson, tooFast } from "./http.ts";
 import { lookup } from "./lookup.ts";
 import { tick } from "./monitor/run.ts";
+import { serviceStatus } from "./monitor/watchdog.ts";
 import { SESSION_COOKIE, SESSION_TTL_SECONDS, signSession, verifyTurnstile } from "./session.ts";
 
 export { ProviderQuota, UsageCounter } from "./quota.ts";
@@ -54,6 +57,17 @@ app.use("*", async (c, next) => {
 });
 
 app.get("/health", (c) => c.json<HealthResponse>({ ok: true }));
+
+/**
+ * The watchdog's latest results (hourly self-tests of each outside service), for the About page and
+ * the GitHub Actions check in watchdog.yml. States only, no details. Needs D1, which comes with accounts.
+ */
+app.get("/status", async (c) => {
+  if (!(await c.env.IP_LIMITER.limit({ key: `status:${clientIp(c)}` })).success) return tooFast(c);
+  if (!accountsEnabled(c.env)) return c.json<StatusResponse>({ ok: true, checkedAt: null, checks: [] });
+  c.header("Cache-Control", "public, max-age=300");
+  return c.json<StatusResponse>(await serviceStatus(db(c.env)));
+});
 
 /** Exchange a Turnstile token for a short-lived signed session cookie. */
 app.post("/session", async (c) => {

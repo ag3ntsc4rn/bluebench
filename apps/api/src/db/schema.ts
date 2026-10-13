@@ -193,3 +193,18 @@ export const intelState = sqliteTable("intel_state", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
 });
+
+/** Latest result of each watchdog check (monitor/watchdog.ts). */
+export const healthCheck = sqliteTable("health_check", {
+  id: text("id").primaryKey(),
+  ok: integer("ok", { mode: "boolean" }).notNull(),
+  /** "off" when the source isn't configured; otherwise a short reason or result. */
+  detail: text("detail").notNull(),
+  checkedAt: time("checked_at").notNull(),
+  /** First run of the current failure streak; null while passing. */
+  failingSince: time("failing_since"),
+  /** Consecutive failed runs. */
+  failures: integer("failures").notNull().default(0),
+  /** True once the owner was told about the current streak (so recovery can be announced). */
+  alerted: integer("alerted", { mode: "boolean" }).notNull().default(false),
+});

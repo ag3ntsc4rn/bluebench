@@ -10,6 +10,7 @@ import { sendMail, takeEmailQuota } from "../mail.ts";
 import { sendPush, type PushMessage, type VapidKeys } from "../push.ts";
 import { checkKev, pruneKevSeen } from "./kev.ts";
 import { lookalikeAlert, scanLookalikes } from "./lookalike.ts";
+import { runWatchdog } from "./watchdog.ts";
 import { certAlert, certAlertDays, gradeDropAlert, hasGradedChecks, mergeStatuses, verificationLostAlert, type AlertText } from "./rules.ts";
 import { hasVerifyRecord, verifyRecord } from "./verify.ts";
 
@@ -32,7 +33,7 @@ export interface TickDeps {
   waitUntil(p: Promise<unknown>): void;
 }
 
-export type TickResult = "off" | "delivered" | "intel" | "checked" | "lookalikes" | "idle";
+export type TickResult = "off" | "delivered" | "intel" | "watchdog" | "checked" | "lookalikes" | "idle";
 
 export function vapidKeys(env: Env): VapidKeys | null {
   if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return null;
@@ -45,7 +46,8 @@ export function vapidKeys(env: Env): VapidKeys | null {
  * 2. re-check the domain that's most overdue (each verified domain once a day), else
  * 3. scan the next chunk of a domain's lookalikes (a full scan of ~120 names takes about 3 runs, daily).
  * At minute 30 of each hour, step 2 and 3 give way to the watchlist check (new known exploited
- * vulnerabilities against accounts' watched products), which is cheap when nothing changed.
+ * vulnerabilities against accounts' watched products), which is cheap when nothing changed, and at
+ * minute 45 to the watchdog (self-tests of every outside service; ~10 subrequests).
  * A verified domain costs about 4 runs a day, so 1,440 runs cover roughly 350 domains.
  */
 export async function tick(env: Env, deps: TickDeps): Promise<TickResult> {
@@ -59,9 +61,14 @@ export async function tick(env: Env, deps: TickDeps): Promise<TickResult> {
     return "delivered";
   }
 
-  if (new Date(now).getUTCMinutes() === 30) {
+  const minute = new Date(now).getUTCMinutes();
+  if (minute === 30) {
     await checkKev(env, d, now);
     return "intel";
+  }
+  if (minute === 45) {
+    await runWatchdog(env, d, now);
+    return "watchdog";
   }
 
   const [due] = await d

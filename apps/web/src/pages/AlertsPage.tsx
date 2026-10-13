@@ -14,6 +14,7 @@ const KIND: Record<AlertKind, { tone: Tone; label: string }> = {
   "verification-lost": { tone: "neutral", label: "Paused" },
   lookalike: { tone: "warn", label: "Lookalike" },
   kev: { tone: "critical", label: "Exploited" },
+  health: { tone: "neutral", label: "Service" },
   test: { tone: "neutral", label: "Test" },
 };
 
