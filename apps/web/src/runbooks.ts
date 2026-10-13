@@ -39,9 +39,9 @@ export interface Runbook {
 }
 
 const IOC = { path: "/ioc-lookup", label: "IOC lookup" };
-const HEADERS = { path: "/email-header-analyzer", label: "Email header analyzer" };
+const HEADERS = { path: "/email-header-analyzer", label: "email header analyzer" };
 const URLS = { path: "/url-decoder", label: "URL decoder" };
-const DOMAINS = { path: "/domain-checker", label: "Domain checker" };
+const DOMAINS = { path: "/domain-checker", label: "domain checker" };
 
 const LEGAL =
   "Personal data may have been exposed: some laws set short deadlines to notify a regulator (72 hours under GDPR) or the people affected. Bring in whoever handles legal or privacy early.";
