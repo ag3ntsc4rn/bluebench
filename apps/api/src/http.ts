@@ -71,26 +71,32 @@ export async function admit(c: Ctx, opts: { anonOnly?: boolean } = {}): Promise<
   return { ok: true, tier: user ? "user" : "anon", user, sessionId, ipKey, secret: SESSION_SECRET };
 }
 
+/** The daily-cap keys and limit for a caller: per account when signed in, else per session and IP group. */
+async function dailyKeys(a: Extract<Admitted, { ok: true }>): Promise<{ keys: string[]; limit: number }> {
+  if (a.user) return { keys: [await hmac(a.secret, `u:${a.user.id}`)], limit: USER_DAILY_LIMIT };
+  return { keys: await Promise.all([hmac(a.secret, `s:${a.sessionId}`), hmac(a.secret, `ip:${a.ipKey}`)]), limit: ANON_DAILY_LIMIT };
+}
+
+/** Bulk lookups: grant as many of `wanted` as today's cap allows (0 at the limit). */
+export async function chargeDailyUpTo(c: Ctx, a: Extract<Admitted, { ok: true }>, wanted: number): Promise<number> {
+  const { keys, limit } = await dailyKeys(a);
+  return (await c.env.USAGE.get(c.env.USAGE.idFromName("daily")).consumeUpTo(keys, limit, wanted)).granted;
+}
+
+/** The message for a caller who has used today's lookups. */
+export function dailyLimitMessage(a: Extract<Admitted, { ok: true }>): string {
+  return a.user
+    ? `You've used today's ${USER_DAILY_LIMIT} lookups and checks. They reset at midnight UTC.`
+    : `You've used today's ${ANON_DAILY_LIMIT} free lookups and checks. They reset at midnight UTC. Sign in (free) for ${USER_DAILY_LIMIT} a day.`;
+}
+
 /**
  * Count one lookup or domain check against today's caps. Counters are keyed by HMACs, so no session
  * ids, account ids or IPs are stored. Accounts are capped per account only, so a shared office IP
  * doesn't hold them to the anonymous limit.
  */
 export async function chargeDaily(c: Ctx, a: Extract<Admitted, { ok: true }>): Promise<Response | null> {
-  const usage = c.env.USAGE.get(c.env.USAGE.idFromName("daily"));
-  if (a.user) {
-    const quota = await usage.consume([await hmac(a.secret, `u:${a.user.id}`)], USER_DAILY_LIMIT);
-    if (quota.ok) return null;
-    return fail(c, 429, {
-      error: "daily-limit",
-      message: `You've used today's ${USER_DAILY_LIMIT} lookups and checks. They reset at midnight UTC.`,
-    });
-  }
-  const keys = await Promise.all([hmac(a.secret, `s:${a.sessionId}`), hmac(a.secret, `ip:${a.ipKey}`)]);
-  const quota = await usage.consume(keys, ANON_DAILY_LIMIT);
-  if (quota.ok) return null;
-  return fail(c, 429, {
-    error: "daily-limit",
-    message: `You've used today's ${ANON_DAILY_LIMIT} free lookups and checks. They reset at midnight UTC. Sign in (free) for ${USER_DAILY_LIMIT} a day.`,
-  });
+  const { keys, limit } = await dailyKeys(a);
+  const quota = await c.env.USAGE.get(c.env.USAGE.idFromName("daily")).consume(keys, limit);
+  return quota.ok ? null : fail(c, 429, { error: "daily-limit", message: dailyLimitMessage(a) });
 }

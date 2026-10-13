@@ -1,6 +1,7 @@
 import { refang } from "./detect.ts";
 import { normalizeDomain } from "./domain.ts";
 import { formatIPv4, formatIPv6, parseIPv4, parseIPv6 } from "./ip.ts";
+import { mergeVerdict, SOURCE_LABELS, type LookupResponse, type Verdict } from "./lookup.ts";
 import { TLDS } from "./tlds.ts";
 
 /**
@@ -95,15 +96,46 @@ export function extractIndicators(input: string, max = MAX_EXTRACTED): Extracted
   return out.sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
 }
 
+/** Key for an extracted item, used to attach its reputation result. */
+export const extractedKey = (i: Extracted) => `${i.kind}:${i.value}`;
+
+/**
+ * A reputation result as it may be exported. Google forbids showing Safe Browsing verdicts past their
+ * cache duration, and a downloaded file keeps them indefinitely, so exports are worked out without it.
+ */
+export interface ExportVerdict {
+  verdict: Verdict;
+  /** Sources that list it (never Safe Browsing). */
+  listedBy: string[];
+}
+export type ExportVerdicts = ReadonlyMap<string, ExportVerdict>;
+
+export function exportVerdict(res: Pick<LookupResponse, "sources">): ExportVerdict {
+  const sources = res.sources.filter((s) => s.source !== "safebrowsing");
+  return {
+    verdict: sources.length > 0 ? mergeVerdict(sources) : "incomplete",
+    listedBy: sources.filter((s) => s.status === "listed").map((s) => SOURCE_LABELS[s.source]),
+  };
+}
+
 /** Spreadsheet apps run cells starting with these as formulas; prefix a quote so they stay text. */
 function csvCell(value: string): string {
   const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
   return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
-/** CSV with a header row. `defang` produces the share-safe form of each value. */
-export function toCsv(items: readonly Extracted[], defang: (item: Extracted) => string): string {
-  const rows = [["type", "value", "defanged"], ...items.map((i) => [i.kind, i.value, defang(i)])];
+/**
+ * CSV with a header row. `defang` produces the share-safe form of each value. The verdict column is
+ * empty for items not checked; it never reflects Safe Browsing (see ExportVerdict).
+ */
+export function toCsv(items: readonly Extracted[], defang: (item: Extracted) => string, verdicts: ExportVerdicts = new Map()): string {
+  const rows = [
+    ["type", "value", "defanged", "verdict", "listed_by"],
+    ...items.map((i) => {
+      const v = verdicts.get(extractedKey(i));
+      return [i.kind, i.value, defang(i), v?.verdict ?? "", v?.listedBy.join("; ") ?? ""];
+    }),
+  ];
   return rows.map((r) => r.map(csvCell).join(",")).join("\r\n") + "\r\n";
 }
 
@@ -131,22 +163,36 @@ export function stixPattern(item: Extracted): string {
 }
 
 /**
- * A STIX 2.1 bundle with one indicator per item. No verdict is implied: these are extracted
- * observables, so indicator_types is left out. `uuid` is injectable for tests.
+ * A STIX 2.1 bundle with one indicator per item. Items a checked source lists get indicator_types
+ * ["malicious-activity"] and a description naming the sources; others imply no verdict. `uuid` is
+ * injectable for tests.
  */
-export function toStixBundle(items: readonly Extracted[], now = new Date(), uuid: () => string = () => crypto.randomUUID()): string {
+export function toStixBundle(
+  items: readonly Extracted[],
+  now = new Date(),
+  uuid: () => string = () => crypto.randomUUID(),
+  verdicts: ExportVerdicts = new Map(),
+): string {
   const ts = now.toISOString();
-  const objects = items.map((item) => ({
-    type: "indicator",
-    spec_version: "2.1",
-    id: `indicator--${uuid()}`,
-    created: ts,
-    modified: ts,
-    name: item.value,
-    pattern: stixPattern(item),
-    pattern_type: "stix",
-    pattern_version: "2.1",
-    valid_from: ts,
-  }));
+  const objects = items.map((item) => {
+    const v = verdicts.get(extractedKey(item));
+    const listed = v?.verdict === "listed";
+    return {
+      type: "indicator",
+      spec_version: "2.1",
+      id: `indicator--${uuid()}`,
+      created: ts,
+      modified: ts,
+      name: item.value,
+      ...(listed && {
+        description: `Listed by ${v.listedBy.join(", ")} (checked with Bluebench on ${ts.slice(0, 10)}).`,
+        indicator_types: ["malicious-activity"],
+      }),
+      pattern: stixPattern(item),
+      pattern_type: "stix",
+      pattern_version: "2.1",
+      valid_from: ts,
+    };
+  });
   return JSON.stringify({ type: "bundle", id: `bundle--${uuid()}`, objects }, null, 2);
 }

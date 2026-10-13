@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { setCookie } from "hono/cookie";
 import {
+  BatchLookupRequestSchema,
   ByoRequestSchema,
   canonicalDomain,
   orgDomain,
@@ -11,6 +12,8 @@ import {
   LookupRequestSchema,
   SECURITY_HEADERS,
   SessionRequestSchema,
+  type BatchItemError,
+  type BatchLookupResponse,
   type ByoResponse,
   type DomainReport,
   type HealthResponse,
@@ -20,7 +23,7 @@ import { account } from "./account.ts";
 import { relay } from "./byo.ts";
 import type { Env } from "./env.ts";
 import { domainReport, hasCachedReport } from "./domain/report.ts";
-import { admit, challenge, chargeDaily, clientIp, fail, notConfigured, readJson, tooFast } from "./http.ts";
+import { admit, challenge, chargeDaily, chargeDailyUpTo, clientIp, dailyLimitMessage, fail, notConfigured, readJson, tooFast } from "./http.ts";
 import { lookup } from "./lookup.ts";
 import { tick } from "./monitor/run.ts";
 import { SESSION_COOKIE, SESSION_TTL_SECONDS, signSession, verifyTurnstile } from "./session.ts";
@@ -101,6 +104,40 @@ app.post("/lookup", async (c) => {
     waitUntil: (p) => c.executionCtx.waitUntil(p),
   });
   return c.json<LookupResponse>(result);
+});
+
+/**
+ * Bulk reputation: up to LOOKUP_BATCH_SIZE indicators per request (the page sends a run in batches).
+ * One request against the per-minute limits; each valid indicator is one unit of the daily cap, and
+ * when fewer are left than asked for, the rest come back as "daily-limit" instead of failing the batch.
+ */
+app.post("/lookup/batch", async (c) => {
+  const a = await admit(c);
+  if (!a.ok) return a.res;
+
+  const body = await readJson(c);
+  if (!body.ok) return body.res;
+  const parsed = BatchLookupRequestSchema.safeParse(body.data);
+  if (!parsed.success) return fail(c, 400, { error: "invalid", message: "Send between 1 and 5 indicators at a time." });
+
+  const items = parsed.data.items.map((req) => ({ req, value: canonicalIndicator(req) }));
+  const wanted = items.filter((i) => i.value).length;
+  const granted = wanted > 0 ? await chargeDailyUpTo(c, a, wanted) : 0;
+  if (wanted > 0 && granted === 0) return fail(c, 429, { error: "daily-limit", message: dailyLimitMessage(a) });
+
+  let allowance = granted;
+  const plan = items.map((i) => ({ ...i, allowed: i.value !== null && allowance-- > 0 }));
+  const deps = { env: c.env, tier: a.tier, waitUntil: (p: Promise<unknown>) => c.executionCtx.waitUntil(p) };
+  const results = await Promise.all(
+    plan.map(({ req, value, allowed }): Promise<BatchLookupResponse["results"][number]> | BatchItemError => {
+      if (!value) {
+        return { ok: false, kind: req.kind, value: req.value, error: "invalid", message: "Not something we can look up: public IPs, domains, URLs and file hashes only." };
+      }
+      if (!allowed) return { ok: false, kind: req.kind, value, error: "daily-limit", message: dailyLimitMessage(a) };
+      return lookup(req.kind, value, deps);
+    }),
+  );
+  return c.json<BatchLookupResponse>({ ok: true, results });
 });
 
 /**
