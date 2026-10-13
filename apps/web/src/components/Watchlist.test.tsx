@@ -6,7 +6,7 @@ import { Watchlist } from "./Watchlist";
 const text = (html: string) => html.replace(/<!-- -->/g, "").replace(/&#x27;/g, "'");
 const noop = async () => null;
 const signedIn: Me = { ok: true, signedIn: true, accountsEnabled: true, email: "a@example.org", emailAlerts: true, pushKey: null };
-const props = { vendors: null, onNeedVendors: () => {}, onAdd: noop, onRemove: noop };
+const props = { onAdd: noop, onRemove: noop };
 
 describe("Watchlist", () => {
   it("invites signed-out visitors to sign in", () => {

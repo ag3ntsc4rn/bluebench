@@ -1,6 +1,6 @@
 /**
  * Build the Intel tab's data: CISA KEV (CC0) joined with FIRST EPSS scores (free; attribution requested).
- * Run by .github/workflows/intel.yml twice a day; writes recent.json and all.json to the given folder,
+ * Run by .github/workflows/intel.yml twice a day; writes recent.json, all.json and vendors.json to the given folder,
  * which the workflow then stores in KV (see KEV_KV_KEYS). Nothing is deployed.
  *
  *   node apps/api/scripts/update-intel.ts <out-dir>
@@ -11,7 +11,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
-import { buildKevDocument, EPSS_SOURCE_URL, KEV_SOURCE_URL, KevDocumentSchema, parseEpssCsv, recentKev } from "@bluebench/shared";
+import { buildKevDocument, EPSS_SOURCE_URL, KEV_SOURCE_URL, KevDocumentSchema, kevVendors, parseEpssCsv, recentKev } from "@bluebench/shared";
 
 const UA = { "user-agent": "Bluebench/1.0 (+https://bluebench.dev)" };
 const out = process.argv[2];
@@ -38,4 +38,5 @@ mkdirSync(out, { recursive: true });
 // Stored exactly as GET /api/intel/kev returns them (a KevResponse), so the Worker never parses them.
 writeFileSync(join(out, "all.json"), JSON.stringify({ ok: true, ...all }));
 writeFileSync(join(out, "recent.json"), JSON.stringify({ ok: true, ...recent }));
+writeFileSync(join(out, "vendors.json"), JSON.stringify({ ok: true, updatedAt: all.updatedAt, vendors: kevVendors(all.entries) }));
 console.log(`KEV ${all.catalogVersion}: ${all.entries.length} entries (${recent.entries.length} recent), EPSS ${epss.date ?? "missing"} for ${epss.scores.size}`);

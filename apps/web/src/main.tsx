@@ -14,8 +14,9 @@ const app = (
 if (root.hasChildNodes()) hydrateRoot(root, app);
 else createRoot(root).render(app);
 
-// Safe to reload for an update unless the user has something in the paste box or a runbook step ticked.
-startPwa({
-  canReloadNow: () =>
-    !document.querySelector<HTMLTextAreaElement>("#paste")?.value.trim() && !document.querySelector("input[data-runbook-step]:checked"),
-});
+// Safe to reload for an update unless the user has typed something (the paste box, or a field marked
+// data-guard-reload) or ticked a runbook step.
+const typing = () =>
+  Boolean(document.querySelector<HTMLTextAreaElement>("#paste")?.value.trim()) ||
+  [...document.querySelectorAll<HTMLInputElement>("input[data-guard-reload]")].some((i) => i.value.trim());
+startPwa({ canReloadNow: () => !typing() && !document.querySelector("input[data-runbook-step]:checked") });

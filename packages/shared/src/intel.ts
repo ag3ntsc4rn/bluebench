@@ -10,10 +10,11 @@ import { z } from "zod";
 export const KEV_SOURCE_URL = "https://raw.githubusercontent.com/cisagov/kev-data/main/known_exploited_vulnerabilities.json";
 export const EPSS_SOURCE_URL = "https://epss.empiricalsecurity.com/epss_scores-current.csv.gz";
 /**
- * KV keys: the last RECENT_DAYS of entries (loaded with the page, ~14 KB compressed) and the whole
- * catalogue (~175 KB, loaded only to search or show older entries). Bump the version when the shape changes.
+ * KV keys: the last RECENT_DAYS of entries (loaded with the page, ~14 KB compressed), the whole
+ * catalogue (~150 KB, loaded only to search or show older entries) and the vendor/product names for
+ * the watchlist picker (~8 KB). Bump the version when a shape changes.
  */
-export const KEV_KV_KEYS = { recent: "intel:kev:recent:v1", all: "intel:kev:all:v1" } as const;
+export const KEV_KV_KEYS = { recent: "intel:kev:recent:v1", all: "intel:kev:all:v1", vendors: "intel:kev:vendors:v1" } as const;
 export type KevScope = keyof typeof KEV_KV_KEYS;
 export const RECENT_DAYS = 90;
 
@@ -51,6 +52,22 @@ export const KevDocumentSchema = z.object({
   entries: z.array(KevEntrySchema),
 });
 export type KevDocument = z.infer<typeof KevDocumentSchema>;
+
+/** GET /api/intel/kev?scope=vendors: KEV's vendors and their products, for the watchlist picker. */
+export interface KevVendorsResponse {
+  ok: true;
+  updatedAt: string;
+  vendors: { vendor: string; products: string[] }[];
+}
+
+/** Up to `limit` vendors whose name contains the query (prefix matches first), for picker suggestions. */
+export function suggestVendors<T extends { vendor: string }>(vendors: readonly T[], query: string, limit = 8): T[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const hits = vendors.filter((v) => v.vendor.toLowerCase().includes(q));
+  const starts = hits.filter((v) => v.vendor.toLowerCase().startsWith(q));
+  return [...starts, ...hits.filter((v) => !starts.includes(v))].slice(0, limit);
+}
 
 /** What GET /api/intel/kev returns, and exactly what's stored in KV. */
 export interface KevResponse extends KevDocument {

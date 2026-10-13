@@ -1,5 +1,5 @@
-import { kevVendors, matchesKev, RECENT_DAYS, watchMatches, type ApiError, type KevEntry, type KevResponse, type Watch } from "@bluebench/shared";
-import { useEffect, useId, useMemo, useState } from "react";
+import { matchesKev, RECENT_DAYS, watchMatches, type ApiError, type KevEntry, type KevResponse, type Watch } from "@bluebench/shared";
+import { useEffect, useId, useState } from "react";
 import { Badge, WhatsThis } from "../components/ui";
 import { Watchlist } from "../components/Watchlist";
 import { addWatch, listWatches, removeWatch, useAccount } from "../lib/account";
@@ -114,7 +114,6 @@ export function IntelPage() {
   const source = (searching || older) && all ? all : recent;
   const doc = source.phase === "ready" ? source.doc : null;
   const matches = doc ? doc.entries.filter((e) => matchesKev(e, query)) : [];
-  const vendors = useMemo(() => (all?.phase === "ready" ? kevVendors(all.doc.entries) : null), [all]);
   const watchControl = (e: KevEntry): WatchControl | undefined =>
     signedIn && watches ? { watched: watches.some((w) => watchMatches(w, e)), onWatch: () => void onAdd(e.vendor, e.product) } : undefined;
 
@@ -131,7 +130,7 @@ export function IntelPage() {
         <WhatsThis>{KEV_EXPLAINER}</WhatsThis>
       </div>
 
-      <Watchlist me={me} watches={watches} vendors={vendors} onNeedVendors={loadAll} onAdd={onAdd} onRemove={onRemove} />
+      <Watchlist me={me} watches={watches} onAdd={onAdd} onRemove={onRemove} />
 
       <div>
         <label htmlFor={searchId} className="block text-sm font-medium">
@@ -143,6 +142,7 @@ export function IntelPage() {
           autoComplete="off"
           autoCapitalize="off"
           spellCheck={false}
+          data-guard-reload
           placeholder="e.g. Fortinet, Exchange, CVE-2024-3400"
           value={query}
           onFocus={loadAll}
