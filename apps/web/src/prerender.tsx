@@ -1,6 +1,7 @@
 import { renderToString } from "react-dom/server";
 import { App } from "./App";
-import { ABOUT, ALERTS, DOMAINS, HOME, NOT_FOUND, PRIVACY, SETTINGS, SIGNIN, SITE_NAME, SITE_URL, TOOLS, type PageMeta } from "./routes";
+import { ABOUT, ALERTS, DOMAINS, HOME, NOT_FOUND, PRIVACY, RESPOND, SETTINGS, SIGNIN, SITE_NAME, SITE_URL, TOOLS, type PageMeta } from "./routes";
+import { RUNBOOKS } from "./runbooks";
 
 /** Build-time only: turns each route into a static HTML file, so crawlers and link previews see real content. */
 
@@ -63,6 +64,8 @@ export function prerenderPages(template: string): PrerenderedPage[] {
     ...TOOLS.map((t) => page(t, `${t.slug}.html`)),
     page(DOMAINS, "domain-checker.html"),
     page(ALERTS, "alerts.html"),
+    page(RESPOND, "respond.html"),
+    ...RUNBOOKS.map((r) => page(r, `respond/${r.slug}.html`)),
     page(SIGNIN, "signin.html", false),
     page(SETTINGS, "settings.html", false),
     page(NOT_FOUND, "404.html", false),

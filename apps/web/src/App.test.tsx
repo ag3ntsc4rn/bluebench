@@ -13,9 +13,22 @@ describe("App", () => {
     expect(html).toContain('for="paste"');
   });
 
-  it("marks Respond and Learn as coming soon", () => {
+  it("marks only Learn as coming soon", () => {
     expect(renderToString(<App initialTab="learn" />)).toContain("Coming soon.");
-    expect(renderToString(<App />).match(/Soon<\/span>/g)).toHaveLength(2);
+    expect(renderToString(<App />).match(/Soon<\/span>/g)).toHaveLength(1);
+  });
+
+  it("serves the Respond tab and each runbook under it", () => {
+    const index = renderToString(<App initialPath="/respond" />);
+    expect(index).toContain('id="respond-heading"');
+    expect(index).toMatch(/aria-current="page"[^>]*>.*?<span>Respond<\/span>/);
+    expect(index).toContain('href="/respond/ransomware"');
+
+    const page = renderToString(<App initialPath="/respond/phishing-link-clicked" />);
+    expect(page).toContain(">Someone clicked a phishing link</h1>");
+    expect(page).toMatch(/aria-current="page"[^>]*>.*?<span>Respond<\/span>/);
+    expect(page).toContain("data-runbook-step");
+    expect(page).toContain('href="/ioc-lookup"');
   });
 
   it("links to the privacy policy from every tab", () => {

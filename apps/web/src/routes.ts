@@ -4,6 +4,8 @@
  * write sitemap.xml. Add a route here and it gets all of that.
  */
 
+import { RUNBOOKS, type Runbook } from "./runbooks";
+
 export const SITE_URL = "https://bluebench.dev";
 export const SITE_NAME = "Bluebench";
 /** The public source code. */
@@ -227,6 +229,14 @@ export const ALERTS: PageMeta = {
     "Free daily monitoring for up to 5 domains you control: push or email alerts when a security grade drops, a certificate nears expiry or a lookalike domain appears.",
 };
 
+/** The Respond tab: incident response runbooks. Each runbook has its own page (runbooks.ts). */
+export const RESPOND: PageMeta = {
+  path: "/respond",
+  title: "Incident response checklists for small teams | Bluebench",
+  description:
+    "Free, practical incident response checklists: phishing clicks, compromised email accounts, ransomware, leaked API keys and lost laptops. Made for use mid-incident.",
+};
+
 export const ABOUT: PageMeta = {
   path: "/about",
   title: "About Bluebench: free, open-source security tools | Bluebench",
@@ -264,6 +274,8 @@ export type Page =
   | { kind: "home" }
   | { kind: "privacy" }
   | { kind: "about" }
+  | { kind: "respond" }
+  | { kind: "runbook"; runbook: Runbook }
   | { kind: "settings" }
   | { kind: "domains" }
   | { kind: "alerts" }
@@ -276,6 +288,9 @@ export function pageForPath(path: string): Page {
   if (p === "/") return { kind: "home" };
   if (p === PRIVACY.path) return { kind: "privacy" };
   if (p === ABOUT.path) return { kind: "about" };
+  if (p === RESPOND.path) return { kind: "respond" };
+  const runbook = RUNBOOKS.find((r) => r.path === p);
+  if (runbook) return { kind: "runbook", runbook };
   if (p === SETTINGS.path) return { kind: "settings" };
   if (p === DOMAINS.path) return { kind: "domains" };
   if (p === ALERTS.path) return { kind: "alerts" };
@@ -292,6 +307,10 @@ export function metaFor(page: Page): PageMeta {
       return PRIVACY;
     case "about":
       return ABOUT;
+    case "respond":
+      return RESPOND;
+    case "runbook":
+      return page.runbook;
     case "settings":
       return SETTINGS;
     case "domains":
