@@ -35,16 +35,25 @@ export function startPwa({ canReloadNow }: { canReloadNow: () => boolean }): voi
 
   sw.register("/sw.js", { scope: "/" })
     .then((registration) => {
-      if (registration.waiting) onWaiting(registration.waiting);
-      registration.addEventListener("updatefound", () => {
-        const installing = registration.installing;
-        installing?.addEventListener("statechange", () => {
-          if (installing.state === "installed" && registration.waiting) onWaiting(registration.waiting);
-        });
-      });
+      const waitingFound = () => {
+        if (registration.waiting) onWaiting(registration.waiting);
+      };
+      // Follow a worker until it's installed. The browser checks for updates by itself when the app
+      // opens, so a worker can already be installing before this code runs and "updatefound" has
+      // fired: without watching registration.installing too, that version would wait unnoticed.
+      const follow = (worker: ServiceWorker | null) => {
+        if (!worker) return;
+        if (worker.state === "installed") waitingFound();
+        else worker.addEventListener("statechange", () => worker.state === "installed" && waitingFound());
+      };
 
+      waitingFound();
+      follow(registration.installing);
+      registration.addEventListener("updatefound", () => follow(registration.installing));
+
+      // Also look for a waiting version after every check, in case one was missed.
       const check = () => {
-        if (navigator.onLine) registration.update().catch(() => {});
+        if (navigator.onLine) registration.update().then(waitingFound, () => {});
       };
       document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") check();
