@@ -86,6 +86,8 @@ describe("App", () => {
   it("serves About and Settings outside the tabs, and links to both from every page", () => {
     const about = renderToString(<App initialPath="/about" />);
     expect(about).toContain('id="about-heading"');
+    expect(about).toContain(">Service status</h2>");
+    expect(about).toContain("Checking…"); // loaded in the browser
     expect(about).not.toContain('aria-current="page"');
 
     const settings = renderToString(<App initialPath="/settings" />);

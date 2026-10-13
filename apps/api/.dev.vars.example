@@ -6,6 +6,7 @@ SESSION_SECRET=dev-only-change-me
 # ABUSECH_AUTH_KEY=
 # SAFE_BROWSING_API_KEY=
 # CERTSPOTTER_API_KEY=       # fallback for certificate checks when crt.sh is down
+# OWNER_EMAIL=               # your account's email: watchdog alerts go there
 # Accounts (magic-link sign-in) need these. Run `pnpm --filter @bluebench/api db:migrate:local` first.
 # BETTER_AUTH_SECRET=dev-only-change-me-to-32-or-more-characters
 # RESEND_API_KEY=            # real key: sign-in emails are really sent

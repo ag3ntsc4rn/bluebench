@@ -166,8 +166,8 @@ describe("recheck", () => {
 describe("tick", () => {
   /** Alerts and domains from other tests may exist; run a few ticks until ours has been handled. */
   async function tickUntil(done: () => Promise<boolean>, now = NOW) {
-    // Minute 30 of each hour belongs to the watchlist check (kev.test.ts); step past it.
-    if (new Date(now).getUTCMinutes() === 30) now += 60_000;
+    // Minutes 30 and 45 belong to the watchlist check and the watchdog; step past them.
+    while ([30, 45].includes(new Date(now).getUTCMinutes())) now += 60_000;
     for (let i = 0; i < 10 && !(await done()); i++) await tick(testEnv, deps(now));
     expect(await done()).toBe(true);
   }

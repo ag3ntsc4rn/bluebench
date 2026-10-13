@@ -244,3 +244,13 @@ export async function certCheck(domain: string, deps: CertDeps): Promise<CertChe
 }
 
 const skipped = (why: string): Check => ({ status: "skipped", summary: `Couldn't check certificates this time: ${why}.`, facts: [] });
+
+/** For the watchdog: ask crt.sh, then Cert Spotter, for a domain's certificates, skipping our cache. */
+export async function probeCertificates(domain: string, deps: CertDeps): Promise<{ ok: true; source: CtSource; count: number } | { ok: false; why: string }> {
+  const crt = await fromCrtsh(domain, deps);
+  if (crt.ok && crt.entries.length > 0) return { ok: true, source: "crt.sh", count: crt.entries.length };
+  const spotter = await fromCertSpotter(domain, deps);
+  if (spotter.ok && spotter.entries.length > 0) return { ok: true, source: "Cert Spotter", count: spotter.entries.length };
+  const why = (r: typeof crt) => (r.ok ? "no certificates" : r.why);
+  return { ok: false, why: `crt.sh: ${why(crt)}; Cert Spotter: ${why(spotter)}` };
+}

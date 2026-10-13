@@ -14,6 +14,7 @@ import {
   type LookupKind,
   type LookupResponse,
   type SourceResult,
+  type StatusResponse,
 } from "@bluebench/shared";
 
 /** Produces a Turnstile token for a site key (runs the invisible challenge). */
@@ -155,3 +156,6 @@ export function lookupBatch(
 ): Promise<BatchLookupResponse | ApiError> {
   return postWithSession<BatchLookupResponse>("/api/lookup/batch", { items }, getToken, fetchImpl);
 }
+
+/** The watchdog's latest results (public; states only). */
+export const fetchStatus = (fetchImpl: typeof fetch = fetch) => requestJson<StatusResponse>("GET", "/api/status", undefined, fetchImpl);

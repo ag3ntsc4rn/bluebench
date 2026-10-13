@@ -104,8 +104,11 @@ export function PrivacyPage() {
           paste into them is never sent to us or anyone else.
         </p>
         <p>
-          The Intel tab loads its list of exploited vulnerabilities from our server. That request carries nothing you've typed:
-          searching the list happens in your browser.
+          The About page loads a short service-status summary from our server, and the Intel tab loads its list of exploited
+          vulnerabilities. Neither request carries anything you've typed.
+        </p>
+        <p>
+          On the Intel tab, searching the list happens in your browser.
         </p>
       </Section>
 

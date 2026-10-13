@@ -1,0 +1,29 @@
+name: Watchdog
+
+# The Worker's hourly self-test (monitor/watchdog.ts) alerts the owner about outside services, but it
+# can't report its own death. This checks from outside that the site answers and the self-test has run
+# in the last 3 hours. A failed run makes GitHub email the repository owner. Deploys nothing.
+on:
+  schedule:
+    - cron: "20 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Site and self-test are alive
+        run: |
+          set -euo pipefail
+          body=$(curl -fsS --max-time 30 https://bluebench.dev/api/status)
+          echo "$body" | jq .
+          checked=$(echo "$body" | jq -r '.checkedAt // empty')
+          if [ -z "$checked" ]; then echo "::error::The watchdog has never run"; exit 1; fi
+          age=$(( $(date -u +%s) - $(date -u -d "$checked" +%s) ))
+          if [ "$age" -gt 10800 ]; then echo "::error::Last self-test was $((age / 3600)) h ago: the cron may have stopped"; exit 1; fi
+          failing=$(echo "$body" | jq -r '[.checks[] | select(.state == "failing") | .label] | join(", ")')
+          if [ -n "$failing" ]; then echo "::warning::Failing: $failing (the owner gets a push or email for these)"; fi
+          curl -fsS --max-time 30 -o /dev/null https://bluebench.dev/

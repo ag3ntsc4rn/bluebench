@@ -65,7 +65,8 @@
     "VAPID_PUBLIC_KEY": "BDdWLL-O2wJNGZLXWMV82f8iqKAxMQTCoQ89rz7lqhgnkZYmIHqXRszEHT_ZXs07M3jL8ENWCV9mew-CmAX21XU"
   },
   // Secrets (wrangler secret put): TURNSTILE_SECRET_KEY, SESSION_SECRET, ABUSECH_AUTH_KEY, SAFE_BROWSING_API_KEY,
-  // BETTER_AUTH_SECRET, RESEND_API_KEY, VAPID_PRIVATE_KEY, CERTSPOTTER_API_KEY
+  // BETTER_AUTH_SECRET, RESEND_API_KEY, VAPID_PRIVATE_KEY, CERTSPOTTER_API_KEY,
+  // OWNER_EMAIL (watchdog alerts go to the account with this address; a secret only to keep it out of the public repo)
   "observability": { "enabled": false },
   "send_metrics": false
 }

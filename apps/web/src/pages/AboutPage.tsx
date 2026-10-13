@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { AppLink } from "../components/AppLink";
+import { ServiceStatus } from "../components/ServiceStatus";
 import { DONATE_URL, SOURCE_URL } from "../routes";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -57,6 +58,10 @@ export function AboutPage() {
           read public DNS through Cloudflare's 1.1.1.1 and certificates from crt.sh or SSLMate's Cert Spotter. A result of "not listed" means just
           that: it's never a promise that something is safe.
         </p>
+      </Section>
+
+      <Section title="Service status">
+        <ServiceStatus />
       </Section>
 
       <Section title="Open source">
