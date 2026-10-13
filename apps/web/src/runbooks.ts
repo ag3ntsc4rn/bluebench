@@ -78,7 +78,7 @@ export const RUNBOOKS: readonly Runbook[] = [
             why: "Each answer leads to different steps below. Ask calmly; people hide mistakes when they expect blame.",
           },
           {
-            do: "If they typed a password: change it now, from a different, trusted device, and sign the account out of all sessions.",
+            do: "If they typed a password or approved an MFA prompt: change the password now, from a different, trusted device, and sign the account out of all sessions.",
             why: "Changing the password alone doesn't end a session the attacker already has.",
           },
           {
@@ -97,6 +97,9 @@ export const RUNBOOKS: readonly Runbook[] = [
           {
             do: "Look for new mail forwarding or inbox rules on the account, and remove any they didn't create.",
             why: "Hidden rules that forward or delete mail are the most common way attackers stay in.",
+          },
+          {
+            do: "Check who else has access to the mailbox (delegates), and, if you're an admin, look for new organisation-wide mail flow rules.",
           },
           {
             do: "Block the sender, the link's domain and any lookalike domains at your email filter and web filter or DNS.",
@@ -157,15 +160,20 @@ export const RUNBOOKS: readonly Runbook[] = [
             tool: DOMAINS,
           },
           {
+            do: "Tell the person who reported it what you found and what you did.",
+            why: "Quick feedback, not blame, is what keeps people reporting (NCSC).",
+          },
+          {
             do: "Share a short, blame-free note with staff about this campaign and how to report the next one.",
           },
         ],
       },
     ],
     sources: [
-      { label: "CISA: Recognize and report phishing", url: "https://www.cisa.gov/secure-our-world/recognize-and-report-phishing" },
       { label: "NCSC: Phishing attacks, defending your organisation", url: "https://www.ncsc.gov.uk/guidance/phishing" },
       { label: "Microsoft: Phishing investigation playbook", url: "https://learn.microsoft.com/en-us/security/operations/incident-response-playbook-phishing" },
+      { label: "Google Safe Browsing: Report a phishing page", url: "https://safebrowsing.google.com/safebrowsing/report_phish/" },
+      { label: "NCSC: Report a scam email (UK)", url: "https://www.ncsc.gov.uk/collection/phishing-scams/report-scam-email" },
     ],
   },
   {
@@ -411,8 +419,8 @@ export const RUNBOOKS: readonly Runbook[] = [
         heading: "Right now",
         steps: [
           {
-            do: "Revoke the key, or change the password, at the service it belongs to. Then issue a new one.",
-            why: "Deleting the commit or message doesn't help: copies already exist in history, forks, caches and scanners.",
+            do: "Issue a new key (or change the password), then revoke or deactivate the leaked one straight away.",
+            why: "Deleting the commit or message doesn't help: copies already exist in history, forks, caches and scanners. Where a service lets you deactivate a key, do that first and delete it once everything works on the new one.",
           },
           {
             do: "Update everything that used the old secret, so services keep working with the new one.",
@@ -426,7 +434,7 @@ export const RUNBOOKS: readonly Runbook[] = [
         heading: "Contain",
         steps: [
           {
-            do: "If it's a cloud key, check for new users, keys, machines or permission changes, and remove anything you didn't create.",
+            do: "If it's a cloud key, check the audit log (for example AWS CloudTrail) for new users, keys, machines or permission changes, and remove anything you didn't create.",
             why: "Stolen cloud keys are often used to create their own access, or to run crypto miners on your bill.",
           },
           {
@@ -453,8 +461,8 @@ export const RUNBOOKS: readonly Runbook[] = [
         heading: "Recover",
         steps: [
           {
-            do: "After rotating, remove the secret from git history with a tool like git filter-repo, then force-push and ask collaborators to re-clone.",
-            why: "Only after rotation: cleaning history takes time and doesn't make an unrotated key safe.",
+            do: "Decide whether to rewrite git history. Once the key is rotated, that's often unnecessary. If you do, use git filter-repo, force-push, and ask collaborators to re-clone rather than merge old branches.",
+            why: "Close or merge open pull requests first. Rewriting never reaches forks or other people's clones, which is why rotation comes first (GitHub).",
           },
           {
             do: "If it was on GitHub, contact GitHub Support to purge cached views of the old commits.",
@@ -563,9 +571,13 @@ export const RUNBOOKS: readonly Runbook[] = [
       },
     ],
     sources: [
-      { label: "NCSC: Device security guidance", url: "https://www.ncsc.gov.uk/collection/device-security-guidance" },
-      { label: "NCSC: Small business guide, response and recovery", url: "https://www.ncsc.gov.uk/collection/small-business-guidance--response-and-recovery" },
-      { label: "ICO: Reporting a personal data breach (UK)", url: "https://ico.org.uk/for-organisations/report-a-breach/" },
+      {
+        label: "ICO: 72 hours, how to respond to a personal data breach (UK)",
+        url: "https://ico.org.uk/for-organisations/advice-for-small-organisations/personal-data-breaches/72-hours-how-to-respond-to-a-personal-data-breach/",
+      },
+      { label: "Microsoft Intune: Wipe devices", url: "https://learn.microsoft.com/en-us/intune/device-management/actions/wipe" },
+      { label: "Apple: Erase a device with Find Devices on iCloud.com", url: "https://support.apple.com/guide/icloud/erase-a-device-mmfc0ef36f/icloud" },
+      { label: "Google Workspace: Wipe corporate data from a device", url: "https://support.google.com/a/answer/173390" },
     ],
   },
 ];
