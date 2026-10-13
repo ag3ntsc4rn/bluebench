@@ -75,6 +75,15 @@ describe("UsageCounter", () => {
     expect((await u.consume(["tok2", "other-ip"], 3, DAY1)).ok).toBe(true);
   });
 
+  it("grants as many as are left, across every key", async () => {
+    const u = usage();
+    await u.consume(["tok", "ip"], 10, DAY1);
+    await u.consume(["other", "ip"], 10, DAY1); // ip is at 2, tok at 1
+    expect(await u.consumeUpTo(["tok", "ip"], 10, 5, DAY1)).toEqual({ granted: 5, used: 7 });
+    expect(await u.consumeUpTo(["tok", "ip"], 10, 5, DAY1)).toEqual({ granted: 3, used: 10 });
+    expect(await u.consumeUpTo(["tok", "ip"], 10, 5, DAY1)).toEqual({ granted: 0, used: 10 });
+  });
+
   it("resets the next UTC day", async () => {
     const u = usage();
     for (let i = 0; i < 3; i++) await u.consume(["k"], 3, DAY1);

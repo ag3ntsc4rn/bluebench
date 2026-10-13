@@ -111,8 +111,9 @@ export function PrivacyPage() {
 
       <Section title="Reputation lookups">
         <p>
-          When you press <strong>Check reputation</strong>, your browser sends that one indicator (an IP address, domain,
-          URL or file hash) to our server. The server asks these sources about it, depending on its type:
+          When you press <strong>Check reputation</strong>, your browser sends that indicator (an IP address, domain,
+          URL or file hash) to our server. From the bulk view, it sends the listed indicators you chose to check, up to 50 at
+          a time. The server asks these sources about each one, depending on its type:
         </p>
         <ul className="list-disc space-y-1 pl-5">
           <li>

@@ -77,7 +77,7 @@ export const TOOLS: readonly ToolRoute[] = [
     name: "IOC extractor",
     title: "IOC extractor: pull IPs, domains, URLs and hashes from text | Bluebench",
     description:
-      "Paste a report, email or log and get every IP, domain, URL, email and hash, refanged and de-duplicated. Export as CSV or STIX 2.1. Runs in your browser.",
+      "Paste a report, email or log and get every IP, domain, URL, email and hash, refanged and de-duplicated. Check them all, then export as CSV or STIX 2.1.",
     h1: "IOC extractor",
     lead: "Paste any text with indicators in it and get a clean list, ready to share, block or import.",
     placeholder: "Paste a threat report, an email, an alert or a log excerpt",
@@ -97,12 +97,23 @@ export const TOOLS: readonly ToolRoute[] = [
         ],
       },
       {
-        heading: "Export",
+        heading: "Check them all",
         paragraphs: [
-          "Copy a defanged list that's safe to paste into chat or a ticket, download a CSV for spreadsheets (protected against formula injection), or download a STIX 2.1 bundle to import into a threat intelligence platform such as MISP or OpenCTI.",
+          "Press Check reputation to look up to 50 at a time against URLhaus, ThreatFox, MalwareBazaar and Google Safe Browsing, each with a verdict. Email addresses and private IPs are skipped, and each check counts toward the daily free lookups.",
         ],
       },
-      { heading: "Nothing is uploaded", paragraphs: [PRIVATE] },
+      {
+        heading: "Export",
+        paragraphs: [
+          "Copy a defanged list that's safe to paste into chat or a ticket, download a CSV for spreadsheets (protected against formula injection), or download a STIX 2.1 bundle to import into a threat intelligence platform such as MISP or OpenCTI. Checked verdicts go into both, leaving out Google Safe Browsing as its terms require.",
+        ],
+      },
+      {
+        heading: "Private until you choose",
+        paragraphs: [
+          "Extraction and exports happen in your browser. Indicators are sent to our server only when you press Check reputation, and they aren't logged.",
+        ],
+      },
     ],
   },
   {

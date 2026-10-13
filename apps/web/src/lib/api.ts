@@ -4,6 +4,7 @@ import {
   byoSourcesFor,
   parseByo,
   type ApiError,
+  type BatchLookupResponse,
   type ByoResponse,
   type ByoSourceId,
   type DomainReport,
@@ -145,3 +146,12 @@ export const fetchKev = (scope: Exclude<KevScope, "vendors"> = "recent", fetchIm
 
 /** KEV's vendor and product names (~8 KB), for the watchlist picker. */
 export const fetchKevVendors = (fetchImpl: typeof fetch = fetch) => requestJson<KevVendorsResponse>("GET", "/api/intel/kev?scope=vendors", undefined, fetchImpl);
+
+/** Bulk reputation: up to LOOKUP_BATCH_SIZE indicators in one request. */
+export function lookupBatch(
+  items: { kind: LookupKind; value: string }[],
+  getToken: GetTurnstileToken,
+  fetchImpl: typeof fetch = fetch,
+): Promise<BatchLookupResponse | ApiError> {
+  return postWithSession<BatchLookupResponse>("/api/lookup/batch", { items }, getToken, fetchImpl);
+}

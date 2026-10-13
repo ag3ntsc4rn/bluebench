@@ -11,6 +11,11 @@ export function isLookupKind(kind: IndicatorKind): kind is LookupKind {
   return (LOOKUP_KINDS as readonly string[]).includes(kind);
 }
 
+/** Lookups and domain checks per UTC day for an anonymous session or IP group. */
+export const ANON_DAILY_LIMIT = 100;
+/** Lookups and domain checks per UTC day for a signed-in account. */
+export const USER_DAILY_LIMIT = 300;
+
 /** Longest indicator we'll send upstream (URLs are the long ones). */
 export const MAX_INDICATOR_LENGTH = 2048;
 
@@ -19,6 +24,33 @@ export const LookupRequestSchema = z.strictObject({
   value: z.string().min(1).max(MAX_INDICATOR_LENGTH),
 });
 export type LookupRequest = z.infer<typeof LookupRequestSchema>;
+
+/**
+ * Bulk reputation: indicators per request. Each can cost a cache read plus a quota permit and an
+ * upstream call per source (up to 7 subrequests), and a Worker request may make 50.
+ */
+export const LOOKUP_BATCH_SIZE = 5;
+/** Indicators one "Check all" run sends, in batches of LOOKUP_BATCH_SIZE. */
+export const BULK_LOOKUP_MAX = 50;
+
+export const BatchLookupRequestSchema = z.strictObject({
+  items: z.array(LookupRequestSchema).min(1).max(LOOKUP_BATCH_SIZE),
+});
+
+/** An item of a batch that wasn't looked up. */
+export interface BatchItemError {
+  ok: false;
+  kind: LookupKind;
+  value: string;
+  error: "invalid" | "daily-limit";
+  message: string;
+}
+
+export interface BatchLookupResponse {
+  ok: true;
+  /** In the order sent. */
+  results: (LookupResponse | BatchItemError)[];
+}
 
 export const SessionRequestSchema = z.strictObject({
   turnstileToken: z.string().min(1).max(4096),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractIndicators, stixPattern, toCsv, toStixBundle, type Extracted } from "./extract.ts";
+import { exportVerdict, extractedKey, extractIndicators, stixPattern, toCsv, toStixBundle, type Extracted } from "./extract.ts";
 
 const kinds = (text: string) => extractIndicators(text).map((e) => `${e.kind}:${e.value}`);
 
@@ -52,10 +52,10 @@ describe("exports", () => {
   it("writes CSV with escaping and formula-injection protection", () => {
     const csv = toCsv(items, (i) => i.value.replace(/\./g, "[.]"));
     expect(csv.split("\r\n")).toEqual([
-      "type,value,defanged",
-      'url,"https://evil.example/a,b","https://evil[.]example/a,b"',
-      "email,'=cmd@evil.example,'=cmd@evil[.]example",
-      `sha1,${"c".repeat(40)},${"c".repeat(40)}`,
+      "type,value,defanged,verdict,listed_by",
+      'url,"https://evil.example/a,b","https://evil[.]example/a,b",,',
+      "email,'=cmd@evil.example,'=cmd@evil[.]example,,",
+      `sha1,${"c".repeat(40)},${"c".repeat(40)},,`,
       "",
     ]);
   });
@@ -91,5 +91,26 @@ describe("TLD check", () => {
   it("keeps real domains, including abused TLDs, and drops file and code names", () => {
     expect(kinds("evil.top bad.xyz payload.zip phish.pl x.cc")).toEqual(["domain:evil.top", "domain:bad.xyz", "domain:payload.zip", "domain:phish.pl", "domain:x.cc"]);
     expect(kinds("login.cgi ld.so array.pop telerik.web.ui com.sun.org.glassfish.external README.md setup.py")).toEqual([]);
+  });
+});
+
+describe("exports with reputation", () => {
+  const url: Extracted = { kind: "url", value: "https://evil.example/" };
+  const sb = { source: "safebrowsing" as const, status: "listed" as const, summary: "", facts: [] };
+  const uh = (status: "listed" | "not-listed") => ({ source: "urlhaus" as const, status, summary: "", facts: [] });
+
+  it("never lets Safe Browsing decide an exported verdict", () => {
+    expect(exportVerdict({ sources: [sb, uh("not-listed")] })).toEqual({ verdict: "not-listed", listedBy: [] });
+    expect(exportVerdict({ sources: [sb, uh("listed")] })).toEqual({ verdict: "listed", listedBy: ["URLhaus"] });
+    expect(exportVerdict({ sources: [sb] })).toEqual({ verdict: "incomplete", listedBy: [] });
+  });
+
+  it("adds verdict columns to CSV and labels listed indicators in STIX", () => {
+    const verdicts = new Map([[extractedKey(url), exportVerdict({ sources: [uh("listed")] })]]);
+    expect(toCsv([url], (i) => i.value, verdicts).split("\r\n")[1]).toBe("url,https://evil.example/,https://evil.example/,listed,URLhaus");
+    const [obj] = JSON.parse(toStixBundle([url], new Date("2026-10-13T12:00:00Z"), () => "00000000-0000-4000-8000-000000000000", verdicts)).objects;
+    expect(obj).toMatchObject({ indicator_types: ["malicious-activity"], description: "Listed by URLhaus (checked with Bluebench on 2026-10-13)." });
+    const [plain] = JSON.parse(toStixBundle([url])).objects;
+    expect(plain.indicator_types).toBeUndefined();
   });
 });

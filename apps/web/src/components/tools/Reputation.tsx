@@ -69,7 +69,7 @@ function SourceRow({ result }: { result: SourceResult }) {
 }
 
 /** Required attribution whenever Safe Browsing results are shown. */
-function SafeBrowsingNotice() {
+export function SafeBrowsingNotice() {
   return (
     <p className="text-sm text-muted">
       <a

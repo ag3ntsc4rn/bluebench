@@ -34,11 +34,8 @@ export const PROVIDER_LIMITS: Readonly<Record<QuotaKey, ProviderLimits>> = {
 /** Anonymous traffic may spend at most this share of a provider's daily budget. */
 export const ANON_SHARE = 0.6;
 
-/** Lookups per UTC day for an anonymous session or IP group. */
-export const ANON_DAILY_LIMIT = 100;
-
-/** Lookups per UTC day for a signed-in account. */
-export const USER_DAILY_LIMIT = 300;
+// Daily lookup caps live in shared so the web app can state them.
+export { ANON_DAILY_LIMIT, USER_DAILY_LIMIT } from "@bluebench/shared";
 
 export type QuotaDenial = "rate" | "daily";
 
@@ -108,6 +105,26 @@ export class UsageCounter extends DurableObject<Env> {
       keys.map((k) => [k, limit]),
       now,
     );
+  }
+
+  /**
+   * Grant up to `wanted` units against every key (bulk lookups): as many as the fullest key has left.
+   * Returns how many were granted (0 at the limit) and the highest count afterwards.
+   */
+  consumeUpTo(keys: string[], limit: number, wanted: number, now = Date.now()): { granted: number; used: number } {
+    const day = utcDay(now);
+    const sql = this.ctx.storage.sql;
+    let used = 0;
+    for (const key of keys) {
+      used = Math.max(used, sql.exec<{ n: number }>("SELECT n FROM usage WHERE day = ? AND key = ?", day, key).toArray()[0]?.n ?? 0);
+    }
+    const granted = Math.max(0, Math.min(wanted, limit - used));
+    if (granted === 0) return { granted, used };
+    for (const key of keys) {
+      sql.exec("INSERT INTO usage (day, key, n) VALUES (?, ?, ?) ON CONFLICT(day, key) DO UPDATE SET n = n + excluded.n", day, key, granted);
+    }
+    if (used === 0) sql.exec("DELETE FROM usage WHERE day < ?", day);
+    return { granted, used: used + granted };
   }
 
   /** Count one against every key, unless any key is already at its own limit. `used` is the highest count. */
