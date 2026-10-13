@@ -5,6 +5,7 @@ export * from "./detect.ts";
 export * from "./domain-report.ts";
 export * from "./domain.ts";
 export * from "./encoding.ts";
+export * from "./intel.ts";
 export * from "./ip.ts";
 export * from "./lookalike.ts";
 export * from "./lookup.ts";

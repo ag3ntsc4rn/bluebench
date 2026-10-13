@@ -13,7 +13,7 @@ const byFile = Object.fromEntries(pages.map((p) => [p.file, p.html]));
 describe("prerender", () => {
   it("writes one file per route plus a 404 page", () => {
     expect(Object.keys(byFile).sort()).toEqual(
-      ["index.html", "privacy.html", "about.html", "settings.html", "domain-checker.html", "alerts.html", "respond.html", "signin.html", "404.html",
+      ["index.html", "privacy.html", "about.html", "settings.html", "domain-checker.html", "alerts.html", "respond.html", "exploited-vulnerabilities.html", "signin.html", "404.html",
         ...RUNBOOKS.map((r) => `respond/${r.slug}.html`), ...TOOLS.map((t) => `${t.slug}.html`)].sort(),
     );
   });

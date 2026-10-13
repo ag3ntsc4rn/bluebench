@@ -3,15 +3,23 @@ import { describe, expect, it } from "vitest";
 import { App } from "./App";
 
 describe("App", () => {
-  it("renders the four-tab nav with Lookup active", () => {
+  it("renders the five-tab nav with Lookup active", () => {
     const html = renderToString(<App />);
-    for (const label of ["Lookup", "Domains", "Alerts", "Respond"]) {
+    for (const label of ["Lookup", "Domains", "Alerts", "Respond", "Intel"]) {
       expect(html).toContain(`<span>${label}</span>`);
     }
     expect(html).not.toContain("<span>Learn</span>");
-    expect(/<nav[\s\S]*<\/nav>/.exec(html)![0].match(/<button/g)).toHaveLength(4);
+    expect(/<nav[\s\S]*<\/nav>/.exec(html)![0].match(/<button/g)).toHaveLength(5);
     expect(html).toMatch(/aria-current="page"[^>]*>.*?<span>Lookup<\/span>/);
     expect(html).toContain('for="paste"');
+  });
+
+  it("serves the Intel tab at /exploited-vulnerabilities, loading the list in the browser", () => {
+    const html = renderToString(<App initialPath="/exploited-vulnerabilities" />);
+    expect(html).toContain('id="intel-heading"');
+    expect(html).toMatch(/aria-current="page"[^>]*>.*?<span>Intel<\/span>/);
+    expect(html).toContain("Loading…");
+    expect(html).toContain("Neither CISA nor FIRST endorses Bluebench.");
   });
 
   it("has no coming-soon tabs", () => {

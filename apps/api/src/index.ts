@@ -6,6 +6,7 @@ import {
   orgDomain,
   canonicalIndicator,
   DomainRequestSchema,
+  KEV_KV_KEYS,
   sha256Hex,
   LookupRequestSchema,
   SECURITY_HEADERS,
@@ -19,7 +20,7 @@ import { account } from "./account.ts";
 import { relay } from "./byo.ts";
 import type { Env } from "./env.ts";
 import { domainReport, hasCachedReport } from "./domain/report.ts";
-import { admit, challenge, chargeDaily, clientIp, fail, notConfigured, readJson } from "./http.ts";
+import { admit, challenge, chargeDaily, clientIp, fail, notConfigured, readJson, tooFast } from "./http.ts";
 import { lookup } from "./lookup.ts";
 import { tick } from "./monitor/run.ts";
 import { SESSION_COOKIE, SESSION_TTL_SECONDS, signSession, verifyTurnstile } from "./session.ts";
@@ -36,7 +37,8 @@ app.use("*", async (c, next) => {
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
     c.res.headers.set(name, value);
   }
-  c.res.headers.set("Cache-Control", "no-store");
+  // Nothing personal is cacheable; the few public routes set their own Cache-Control.
+  if (!c.res.headers.has("Cache-Control")) c.res.headers.set("Cache-Control", "no-store");
 });
 
 /** Reject cross-site requests outright (the session cookies are also SameSite=Strict). */
@@ -118,6 +120,19 @@ app.post("/byo", async (c) => {
     return fail(c, 400, { error: "invalid", message: "That isn't something we can look up with your keys." });
   }
   return c.json<ByoResponse>({ ok: true, sources: await relay(parsed.data, value) });
+});
+
+/**
+ * Known exploited vulnerabilities for the Intel tab: the last 90 days by default, or the whole catalogue
+ * with ?scope=all. Built twice a day by .github/workflows/intel.yml and served from KV byte-for-byte (no
+ * parsing). Public data, so no session; a per-IP limit stops it being used as a free mirror.
+ */
+app.get("/intel/kev", async (c) => {
+  if (!(await c.env.IP_LIMITER.limit({ key: `intel:${clientIp(c)}` })).success) return tooFast(c);
+  const scope = c.req.query("scope") === "all" ? "all" : "recent";
+  const body = await c.env.VERDICTS.get(KEV_KV_KEYS[scope], "stream").catch(() => null);
+  if (!body) return fail(c, 503, { error: "unavailable", message: "The vulnerability list isn't loaded yet. Check back shortly." });
+  return new Response(body, { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=900" } });
 });
 
 /** Domain report card: DNS, email authentication, HTTPS, headers and certificate checks. */

@@ -7,6 +7,8 @@ import {
   type ByoResponse,
   type ByoSourceId,
   type DomainReport,
+  type KevResponse,
+  type KevScope,
   type LookupKind,
   type LookupResponse,
   type SourceResult,
@@ -135,3 +137,7 @@ export async function byoLookup(
   const all = [...d, ...r];
   return sources.flatMap((s) => all.filter((x) => x.source === s));
 }
+
+/** Known exploited vulnerabilities: the last 90 days, or the whole catalogue. Public: no session needed. */
+export const fetchKev = (scope: KevScope = "recent", fetchImpl: typeof fetch = fetch) =>
+  requestJson<KevResponse>("GET", `/api/intel/kev${scope === "all" ? "?scope=all" : ""}`, undefined, fetchImpl);
