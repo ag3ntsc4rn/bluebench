@@ -6,7 +6,6 @@ import { AlertsPage } from "./pages/AlertsPage";
 import { DomainsPage } from "./pages/DomainsPage";
 import { LookupPage } from "./pages/LookupPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
-import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { RespondPage } from "./pages/RespondPage";
 import { RunbookPage } from "./pages/RunbookPage";
@@ -78,8 +77,7 @@ export function App({ initialTab = "lookup", initialPath }: { initialTab?: TabId
   else if (tab.id === "lookup") content = <LookupPage />;
   else if (tab.id === "domains") content = <DomainsPage />;
   else if (tab.id === "alerts") content = <AlertsPage />;
-  else if (tab.id === "respond") content = <RespondPage />;
-  else content = <PlaceholderPage title={tab.label} comingSoon={tab.comingSoon} />;
+  else content = <RespondPage />;
 
   const navActive = page.kind === "home" ? active : (TAB_OF[page.kind] ?? null);
 

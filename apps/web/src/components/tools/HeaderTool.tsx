@@ -1,6 +1,7 @@
 import { analyzeHeaders, type AuthMethod, type AuthResult } from "../../lib/email-headers";
+import { AUTH_EXPLAINERS, HOPS_EXPLAINER } from "../../lib/explainers";
 import { summarizeHeaders } from "../../lib/summaries";
-import { Badge, CopyButton, Facts, FindingList, Panel, type Tone } from "../ui";
+import { Badge, CopyButton, Facts, FindingList, Panel, WhatsThis, type Tone } from "../ui";
 
 const METHOD_LABELS: Record<AuthMethod, string> = { spf: "SPF", dkim: "DKIM", dmarc: "DMARC" };
 
@@ -25,6 +26,9 @@ function AuthRow({ method, results }: { method: AuthMethod; results: AuthResult[
           </span>
         ))
       )}
+      <div className="basis-full">
+        <WhatsThis>{AUTH_EXPLAINERS[method]}</WhatsThis>
+      </div>
     </li>
   );
 }
@@ -96,6 +100,7 @@ export function HeaderTool({ raw }: { raw: string }) {
           </ol>
         )}
         <p className="text-xs text-muted">Oldest first. Hops added before the message reached your provider can be forged.</p>
+        <WhatsThis>{HOPS_EXPLAINER}</WhatsThis>
       </Panel>
     </>
   );

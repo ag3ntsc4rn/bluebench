@@ -85,13 +85,13 @@ Ask before adding any dependency outside this list.
 
 ## Design
 
-Match the approved mockup: dark theme, five-tab bottom nav on mobile (side nav on desktop).
+Match the approved mockup: dark theme, four-tab bottom nav on mobile (side nav on desktop). The fifth tab, Learn, was dropped on 2026-10-12: a standalone glossary or phishing quiz adds little that Cloudflare, NIST or Google don't already do better. Explanations live where terms appear instead ("What's this?" in results, `apps/web/src/lib/explainers.ts`).
 
 - Colors: ground `#0E1116`, surface `#171B22`, border `#262C36`, text `#E8EAED`, muted `#9AA3AE`, accent blue `#5B8CFF` (dark text `#050B18` on it, 6.2:1)
 - Status: OK sky blue `#6CB4FF`, warning amber `#F5A524`, critical coral `#FF8A6B`. Always pair color with a text label. The accent is used for actions and brand (filled buttons, active nav, focus rings), the status colours only for outlined labels, so the two blues don't compete.
 - Type: IBM Plex Sans for UI, IBM Plex Mono for indicators, hashes and code
 - Touch targets ≥ 44 px; text contrast ≥ 4.5:1; real `<button>`/`<a>`/`<label>` elements
-- Tabs: **Lookup** (home), **Domains**, **Alerts**, **Respond** (incident runbooks), **Learn** (coming soon)
+- Tabs: **Lookup** (home), **Domains**, **Alerts**, **Respond** (incident runbooks)
 
 ## v1 features
 

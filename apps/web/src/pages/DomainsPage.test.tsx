@@ -50,3 +50,12 @@ describe("DomainReportView", () => {
     expect(html).not.toMatch(/\\sstyle="/);
   });
 });
+
+describe("DomainReportView explanations", () => {
+  it("offers a collapsed \"What's this?\" on every check", () => {
+    const html = text(renderToString(<DomainReportView report={report} />));
+    expect(html.match(/<summary[^>]*>What's this\?<\/summary>/g)).toHaveLength(report.checks.length);
+    expect(html).toContain("It's what actually stops others sending email as you");
+    expect(html).not.toMatch(/<details[^>]* open/);
+  });
+});
