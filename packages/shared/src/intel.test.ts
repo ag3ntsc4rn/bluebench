@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildKevDocument, firstAdvisory, KEV_MIN_ENTRIES, matchesKev, parseEpssCsv, plainAction, recentKev } from "./intel.ts";
+import { buildKevDocument, firstAdvisory, KEV_MIN_ENTRIES, kevVendors, matchesKev, parseEpssCsv, plainAction, recentKev, watchMatches, WatchSchema } from "./intel.ts";
 
 const raw = (i: number, extra: object = {}) => ({
   cveID: `CVE-2026-${String(10000 + i)}`,
@@ -109,5 +109,35 @@ describe("plainAction", () => {
 
   it("keeps specific instructions as written", () => {
     expect(plainAction("Disable the SSL VPN until patched.")).toBe("Disable the SSL VPN until patched.");
+  });
+});
+
+describe("watchlist matching", () => {
+  const e = { vendor: "Microsoft", product: "Exchange Server" };
+  it("matches a whole vendor or one product, ignoring case and spaces", () => {
+    expect(watchMatches({ vendor: "microsoft", product: null }, e)).toBe(true);
+    expect(watchMatches({ vendor: " Microsoft ", product: "exchange server" }, e)).toBe(true);
+    expect(watchMatches({ vendor: "Microsoft", product: "Windows" }, e)).toBe(false);
+    expect(watchMatches({ vendor: "Micro", product: null }, e)).toBe(false);
+  });
+
+  it("lists vendors and their products for the picker, sorted and de-duplicated", () => {
+    expect(
+      kevVendors([
+        { vendor: "Microsoft", product: "Windows" },
+        { vendor: "microsoft", product: "Exchange Server" },
+        { vendor: "Apple", product: "iOS" },
+        { vendor: "Microsoft", product: "windows" },
+      ]),
+    ).toEqual([
+      { vendor: "Apple", products: ["iOS"] },
+      { vendor: "Microsoft", products: ["Exchange Server", "Windows"] },
+    ]);
+  });
+
+  it("validates watch input", () => {
+    expect(WatchSchema.safeParse({ vendor: "Fortinet", product: null }).success).toBe(true);
+    expect(WatchSchema.safeParse({ vendor: "", product: null }).success).toBe(false);
+    expect(WatchSchema.safeParse({ vendor: "Fortinet" }).success).toBe(false);
   });
 });

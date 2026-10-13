@@ -43,6 +43,10 @@ describe("PrivacyPage", () => {
     expect(html).toContain("passes them on and returns the answer");
   });
 
+  it("lists the watchlist among what an account stores", () => {
+    expect(html).toContain("The vendors and products you watch");
+  });
+
   it("says the Intel tab's search stays in the browser", () => {
     expect(html).toContain("searching the list happens in your browser");
   });

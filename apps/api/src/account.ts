@@ -4,21 +4,26 @@ import {
   canonicalDomain,
   MAX_PUSH_SUBSCRIPTIONS,
   MAX_SAVED_DOMAINS,
+  MAX_WATCHES,
   PushSubscriptionSchema,
   PushUnsubscribeSchema,
   SaveDomainSchema,
   SignInCodeSchema,
   SignInRequestSchema,
   VerifySignInSchema,
+  watchKey,
+  WatchSchema,
   type AlertItem,
   type AlertsResponse,
   type DomainsResponse,
   type Me,
   type SavedDomain,
+  type Watch,
+  type WatchesResponse,
 } from "@bluebench/shared";
-import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { accountsEnabled, CODE_ATTEMPTS, currentUser, db, getAuth, MailFailed, type AccountUser } from "./auth.ts";
-import { alert, domain, lookalike, pushSubscription, user, verification } from "./db/schema.ts";
+import { alert, domain, lookalike, pushSubscription, user, verification, watch } from "./db/schema.ts";
 import { Budget, Resolver } from "./dns.ts";
 import type { Env } from "./env.ts";
 import { admit, clientIp, fail, readJson, tooFast, type Ctx } from "./http.ts";
@@ -270,6 +275,52 @@ account.delete("/domains/:id", async (c) => {
   const g = await requireWriter(c);
   if (!g.ok) return g.res;
   await db(c.env).delete(domain).where(and(eq(domain.id, c.req.param("id")), eq(domain.userId, g.user.id)));
+  return c.json({ ok: true });
+});
+
+const toWatch = (w: typeof watch.$inferSelect): Watch => ({ id: w.id, vendor: w.vendor, product: w.product, createdAt: w.createdAt.toISOString() });
+
+/** Products watched for new known exploited vulnerabilities (Intel tab). */
+account.get("/watches", async (c) => {
+  const g = await requireUser(c);
+  if (!g.ok) return g.res;
+  const rows = await db(c.env).select().from(watch).where(eq(watch.userId, g.user.id)).orderBy(asc(watch.vendorKey), asc(watch.product));
+  return c.json<WatchesResponse>({ ok: true, watches: rows.map(toWatch) });
+});
+
+/**
+ * Watch a vendor (product null) or one product, by KEV's names. Names aren't checked against the
+ * catalogue (that would mean parsing it in the Worker): the picker only offers real names, and a
+ * mistyped one simply never matches.
+ */
+account.post("/watches", async (c) => {
+  const g = await requireWriter(c);
+  if (!g.ok) return g.res;
+  const body = await readJson(c);
+  if (!body.ok) return body.res;
+  const parsed = WatchSchema.safeParse(body.data);
+  if (!parsed.success) return fail(c, 400, { error: "invalid", message: "Choose a vendor, and optionally one of its products." });
+  const { vendor, product } = parsed.data;
+
+  const d = db(c.env);
+  const mine = await d.select().from(watch).where(eq(watch.userId, g.user.id));
+  const key = (p: string | null) => (p === null ? null : watchKey(p));
+  // Already covered: the same watch, or the whole vendor.
+  const covered = mine.find((w) => w.vendorKey === watchKey(vendor) && (w.product === null || key(w.product) === key(product)));
+  if (covered) return c.json({ ok: true, watch: toWatch(covered) });
+  if (mine.length >= MAX_WATCHES) return fail(c, 409, { error: "invalid", message: `You can watch up to ${MAX_WATCHES} vendors or products. Remove one to add another.` });
+
+  const row = { id: crypto.randomUUID(), userId: g.user.id, vendor, product, vendorKey: watchKey(vendor), createdAt: new Date() };
+  await d.insert(watch).values(row);
+  // Watching a whole vendor makes its single-product watches redundant.
+  if (product === null) await d.delete(watch).where(and(eq(watch.userId, g.user.id), eq(watch.vendorKey, row.vendorKey), isNotNull(watch.product)));
+  return c.json({ ok: true, watch: toWatch(row) });
+});
+
+account.delete("/watches/:id", async (c) => {
+  const g = await requireWriter(c);
+  if (!g.ok) return g.res;
+  await db(c.env).delete(watch).where(and(eq(watch.id, c.req.param("id")), eq(watch.userId, g.user.id)));
   return c.json({ ok: true });
 });
 

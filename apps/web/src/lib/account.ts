@@ -1,4 +1,4 @@
-import type { AlertsResponse, ApiError, DomainsResponse, Me, SavedDomain } from "@bluebench/shared";
+import type { AlertsResponse, ApiError, DomainsResponse, Me, SavedDomain, Watch, WatchesResponse } from "@bluebench/shared";
 import { useEffect, useSyncExternalStore } from "react";
 import { postWithSession, requestJson, type GetTurnstileToken } from "./api";
 
@@ -152,3 +152,6 @@ export const saveDomain = (domain: string) => authed<{ ok: true; domain: SavedDo
 export const verifyDomain = (id: string) => authed<{ ok: true; domain: SavedDomain }>("POST", `/api/domains/${encodeURIComponent(id)}/verify`);
 export const removeDomain = (id: string) => authed<{ ok: true }>("DELETE", `/api/domains/${encodeURIComponent(id)}`);
 export const listAlerts = () => authed<AlertsResponse>("GET", "/api/alerts");
+export const listWatches = () => authed<WatchesResponse>("GET", "/api/watches");
+export const addWatch = (vendor: string, product: string | null) => authed<{ ok: true; watch: Watch }>("POST", "/api/watches", { vendor, product });
+export const removeWatch = (id: string) => authed<{ ok: true }>("DELETE", `/api/watches/${encodeURIComponent(id)}`);

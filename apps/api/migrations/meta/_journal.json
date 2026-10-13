@@ -15,6 +15,13 @@
       "when": 1791811819035,
       "tag": "0001_lookalikes",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791856946850,
+      "tag": "0002_watchlist",
+      "breakpoints": true
     }
   ]
 }

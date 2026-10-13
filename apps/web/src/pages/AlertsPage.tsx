@@ -13,6 +13,7 @@ const KIND: Record<AlertKind, { tone: Tone; label: string }> = {
   "cert-expiry": { tone: "warn", label: "Certificate" },
   "verification-lost": { tone: "neutral", label: "Paused" },
   lookalike: { tone: "warn", label: "Lookalike" },
+  kev: { tone: "critical", label: "Exploited" },
   test: { tone: "neutral", label: "Test" },
 };
 
@@ -184,7 +185,7 @@ export function AlertsPage({ heading = "Alerts", lead }: { heading?: string; lea
         </h1>
         <p className="mt-1 text-muted">
           {lead ??
-            `Save up to ${MAX_SAVED_DOMAINS} domains on the Domains tab and verify them; Bluebench re-checks them daily and tells you when a grade drops, a certificate is close to expiring or a lookalike domain starts resolving.`}
+            `Save up to ${MAX_SAVED_DOMAINS} domains on the Domains tab and verify them; Bluebench re-checks them daily and tells you when a grade drops, a certificate is close to expiring or a lookalike domain starts resolving. Watch products on the Intel tab to hear when one of them is being exploited.`}
         </p>
       </div>
       {me === null && <p className="text-sm text-muted">Loading…</p>}
