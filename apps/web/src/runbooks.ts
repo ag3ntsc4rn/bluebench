@@ -22,6 +22,12 @@ export interface RunbookPhase {
   steps: RunbookStep[];
 }
 
+/** A public guide this runbook was checked against, or that goes deeper. */
+export interface RunbookSource {
+  label: string;
+  url: string;
+}
+
 export interface Runbook {
   slug: RunbookSlug;
   path: `/respond/${RunbookSlug}`;
@@ -36,6 +42,7 @@ export interface Runbook {
   /** When to stop and get professional help. */
   escalate: string[];
   phases: RunbookPhase[];
+  sources: RunbookSource[];
 }
 
 const IOC = { path: "/ioc-lookup", label: "IOC lookup" };
@@ -155,6 +162,11 @@ export const RUNBOOKS: readonly Runbook[] = [
         ],
       },
     ],
+    sources: [
+      { label: "CISA: Recognize and report phishing", url: "https://www.cisa.gov/secure-our-world/recognize-and-report-phishing" },
+      { label: "NCSC: Phishing attacks, defending your organisation", url: "https://www.ncsc.gov.uk/guidance/phishing" },
+      { label: "Microsoft: Phishing investigation playbook", url: "https://learn.microsoft.com/en-us/security/operations/incident-response-playbook-phishing" },
+    ],
   },
   {
     slug: "compromised-email-account",
@@ -176,14 +188,16 @@ export const RUNBOOKS: readonly Runbook[] = [
         heading: "Right now",
         steps: [
           {
+            do: "Block sign-in for the account while you investigate.",
+            why: "Microsoft recommends disabling the account first. If you can't, go straight to the password reset.",
+          },
+          {
             do: "Reset the password from a trusted device, and sign the account out of all sessions.",
-            why: "In Microsoft 365 and Google Workspace, admins can revoke a user's sessions from the admin console.",
+            why: "Revoking sessions ends access the attacker already has. Don't send the new password by email: they may still be reading it.",
           },
           {
             do: "Remove MFA methods and app passwords the owner doesn't recognise, then have them re-register MFA.",
-          },
-          {
-            do: "If you can't do these quickly, block sign-in for the account until you can.",
+            why: "App passwords aren't revoked by a password reset.",
           },
         ],
       },
@@ -191,7 +205,7 @@ export const RUNBOOKS: readonly Runbook[] = [
         heading: "Contain",
         steps: [
           {
-            do: "Remove forwarding addresses and inbox rules the owner didn't create, especially ones that move, delete or mark mail as read.",
+            do: "Remove forwarding addresses and inbox rules the owner didn't create, including hidden rules, especially ones that move, delete or mark mail as read.",
             why: "Attackers hide replies from the real owner, often for mail about invoices or payments.",
           },
           {
@@ -200,6 +214,9 @@ export const RUNBOOKS: readonly Runbook[] = [
           },
           {
             do: "Check delegates and shared access on the mailbox, and remove any that were added recently.",
+          },
+          {
+            do: "Check the account's admin roles, and remove any it shouldn't have.",
           },
         ],
       },
@@ -252,6 +269,11 @@ export const RUNBOOKS: readonly Runbook[] = [
         ],
       },
     ],
+    sources: [
+      { label: "Microsoft: Respond to a compromised email account in Microsoft 365", url: "https://learn.microsoft.com/en-us/defender-office-365/responding-to-a-compromised-email-account" },
+      { label: "Google Workspace: Identify and secure compromised accounts", url: "https://support.google.com/a/answer/2984349" },
+      { label: "Microsoft: App consent grant investigation", url: "https://learn.microsoft.com/en-us/security/operations/incident-response-playbook-app-consent" },
+    ],
   },
   {
     slug: "ransomware",
@@ -277,6 +299,10 @@ export const RUNBOOKS: readonly Runbook[] = [
           },
           {
             do: "If several machines are affected, take the network itself offline at the switch or firewall.",
+          },
+          {
+            do: "Coordinate by phone or in person, not by email or chat on the affected network.",
+            why: "Attackers may be reading company email and can react if they see you responding.",
           },
           {
             do: "Photograph the ransom note and note the time, the machine name and who found it.",
@@ -308,6 +334,14 @@ export const RUNBOOKS: readonly Runbook[] = [
         steps: [
           {
             do: "Work out which machines and shares are affected, and which aren't.",
+          },
+          {
+            do: "Save logs (and, if you can, disk and memory images) from affected systems before wiping or restoring anything.",
+            why: "Investigators and insurers need them, and they show how the attacker got in.",
+          },
+          {
+            do: "Look for new admin accounts, remote-access tools you didn't install, and disabled security or backup software.",
+            why: "These are how attackers come back after you restore.",
           },
           {
             do: "Check No More Ransom (nomoreransom.org) for a free decryptor for this ransomware family.",
@@ -350,6 +384,11 @@ export const RUNBOOKS: readonly Runbook[] = [
           },
         ],
       },
+    ],
+    sources: [
+      { label: "CISA: #StopRansomware Guide (response checklist)", url: "https://www.cisa.gov/stopransomware/ransomware-guide" },
+      { label: "NCSC: Mitigating malware and ransomware attacks", url: "https://www.ncsc.gov.uk/guidance/mitigating-malware-and-ransomware-attacks" },
+      { label: "No More Ransom: free decryptors", url: "https://www.nomoreransom.org/" },
     ],
   },
   {
@@ -437,6 +476,11 @@ export const RUNBOOKS: readonly Runbook[] = [
         ],
       },
     ],
+    sources: [
+      { label: "GitHub: Removing sensitive data from a repository", url: "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository" },
+      { label: "OWASP: Secrets Management Cheat Sheet", url: "https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html" },
+      { label: "AWS: Unauthorized activity in an AWS account", url: "https://repost.aws/knowledge-center/potential-account-compromise" },
+    ],
   },
   {
     slug: "lost-laptop",
@@ -518,7 +562,24 @@ export const RUNBOOKS: readonly Runbook[] = [
         ],
       },
     ],
+    sources: [
+      { label: "NCSC: Device security guidance", url: "https://www.ncsc.gov.uk/collection/device-security-guidance" },
+      { label: "NCSC: Small business guide, response and recovery", url: "https://www.ncsc.gov.uk/collection/small-business-guidance--response-and-recovery" },
+      { label: "ICO: Reporting a personal data breach (UK)", url: "https://ico.org.uk/for-organisations/report-a-breach/" },
+    ],
   },
+];
+
+/** General incident response frameworks, listed on the Respond page. */
+export const IR_FRAMEWORKS: readonly RunbookSource[] = [
+  { label: "NIST SP 800-61 Rev. 3: Incident response recommendations", url: "https://csrc.nist.gov/pubs/sp/800/61/r3/final" },
+  { label: "SANS: Incident Handler's Handbook", url: "https://www.sans.org/white-papers/33901/" },
+  {
+    label: "CISA: Incident and vulnerability response playbooks",
+    url: "https://www.cisa.gov/resources-tools/resources/federal-government-cybersecurity-incident-and-vulnerability-response-playbooks",
+  },
+  { label: "NCSC: Small business guide, response and recovery", url: "https://www.ncsc.gov.uk/collection/small-business-guidance--response-and-recovery" },
+  { label: "Microsoft: Incident response playbooks", url: "https://learn.microsoft.com/en-us/security/operations/incident-response-playbooks" },
 ];
 
 /** A runbook as plain text with checkboxes, for tickets and incident notes. `done` holds ticked step ids. */

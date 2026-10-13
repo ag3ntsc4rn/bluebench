@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { pageForPath } from "./routes";
-import { RUNBOOKS, runbookText, stepId } from "./runbooks";
+import { IR_FRAMEWORKS, RUNBOOKS, runbookText, stepId } from "./runbooks";
 
 describe("runbooks", () => {
   it("have unique slugs and paths under /respond", () => {
@@ -20,6 +20,14 @@ describe("runbooks", () => {
         if (step.tool) expect(pageForPath(step.tool.path).kind, `${r.slug}: ${step.tool.path}`).not.toBe("notfound");
       }
     }
+  });
+
+  it("cite public guides over HTTPS, without duplicates", () => {
+    for (const r of RUNBOOKS) {
+      expect(r.sources.length, r.slug).toBeGreaterThanOrEqual(2);
+      expect(new Set(r.sources.map((s) => s.url)).size, r.slug).toBe(r.sources.length);
+    }
+    for (const s of [...IR_FRAMEWORKS, ...RUNBOOKS.flatMap((r) => r.sources)]) expect(new URL(s.url).protocol).toBe("https:");
   });
 
   it("copy as plain text with the ticked steps marked", () => {

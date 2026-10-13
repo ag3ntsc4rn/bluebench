@@ -90,6 +90,23 @@ export function RunbookPage({ runbook }: { runbook: Runbook }) {
         </section>
       ))}
 
+
+      <section aria-labelledby="sources-heading" className="space-y-2">
+        <h2 id="sources-heading" className="text-lg font-semibold">
+          Sources and further reading
+        </h2>
+        <ul className="space-y-1 text-sm">
+          {runbook.sources.map((src) => (
+            <li key={src.url}>
+              <a href={src.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-accent underline">
+                {src.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+        <p className="text-sm text-muted">This checklist was checked against these public guides, which go into more depth. Bluebench isn't affiliated with them.</p>
+      </section>
+
       <p className="text-sm text-muted">
         General guidance, not a substitute for your own incident response plan or professional help. Your ticks stay on this
         page only and aren't saved.
