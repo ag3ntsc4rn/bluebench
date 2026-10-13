@@ -123,11 +123,87 @@ describe("runReport", () => {
     expect(rows.length).toBeGreaterThan(0);
   });
 
+  describe("Cert Spotter fallback", () => {
+    const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().replace(/\.\d+Z$/, "Z");
+    let id = 1000;
+    const issuance = (names: string[], from: number, to: number, extra: object = {}) => ({
+      id: String(id++),
+      dns_names: names,
+      issuer: { friendly_name: "Let's Encrypt", name: "C=US, O=Let's Encrypt, CN=YE2" },
+      not_before: inDays(from),
+      not_after: inDays(to),
+      revoked: false,
+      ...extra,
+    });
+
+    it("is used when crt.sh is down, with our key, and the result names its source", async () => {
+      const d = uniq();
+      const calls = mockNet({ ...goodDomain(d), crtsh: 502, certspotter: [[issuance([d, `www.${d}`], -10, 80)]] });
+      const auth: (string | null)[] = [];
+      const real = vi.mocked(fetch).getMockImplementation()!;
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        const req = new Request(input, init);
+        if (req.url.startsWith("https://api.certspotter.com/")) auth.push(req.headers.get("authorization"));
+        return real(input, init);
+      });
+      const r = await runReport(d, deps);
+      const c = byId(r);
+      expect(c.cert.status).toBe("pass");
+      expect(c.cert.facts).toContainEqual({ label: "Source", value: "Cert Spotter" });
+      expect(r.certificate?.issuer).toBe("Let's Encrypt");
+      expect(auth).toEqual(["Bearer test-certspotter-key", "Bearer test-certspotter-key"]); // one page, then the empty page
+      expect(calls.find((u) => u.startsWith("https://api.certspotter.com/"))).toContain("match_wildcards=true");
+      expect(outbound(calls)).toBeLessThanOrEqual(REPORT_BUDGET);
+    });
+
+    it("is used when crt.sh answers with nothing", async () => {
+      const d = uniq();
+      mockNet({ ...goodDomain(d), crtsh: [], certspotter: [[issuance([`*.${d.slice(d.indexOf(".") + 1)}`, d], -10, 80)]] });
+      expect(byId(await runReport(d, deps)).cert).toMatchObject({ status: "pass" });
+    });
+
+    it("reads every page, so it judges the newest certificate, and ignores revoked or unrelated ones", async () => {
+      const d = uniq();
+      const old = Array.from({ length: 100 }, () => issuance([d], -80, 10)); // would warn if judged alone
+      mockNet({
+        ...goodDomain(d),
+        crtsh: 502,
+        certspotter: [old, [issuance([d], -2, 88, { revoked: true }), issuance(["other.test"], -1, 89), issuance([d], -5, 85)]],
+      });
+      const c = byId(await runReport(d, deps)).cert;
+      expect(c.status).toBe("pass");
+      expect(c.facts).toContainEqual({ label: "Issued", value: inDays(-5).slice(0, 10) });
+    });
+
+    it("skips a domain with too many pages instead of judging a partial list", async () => {
+      const d = uniq();
+      const pages = Array.from({ length: 4 }, () => Array.from({ length: 100 }, () => issuance([d], -80, 10)));
+      mockNet({ ...goodDomain(d), crtsh: 502, certspotter: pages });
+      expect(byId(await runReport(d, deps)).cert).toMatchObject({
+        status: "skipped",
+        summary: "Couldn't check certificates this time: crt.sh is overloaded right now, and the domain has too many certificates to check quickly.",
+      });
+    });
+
+    it("leaves the check skipped (with crt.sh's reason) when the fallback fails too", async () => {
+      const d = uniq();
+      mockNet({ ...goodDomain(d), crtsh: 502, certspotter: 429 });
+      expect(byId(await runReport(d, deps)).cert).toMatchObject({ status: "skipped", summary: "Couldn't check certificates this time: crt.sh is overloaded right now, and Cert Spotter didn't answer." });
+    });
+
+    it("isn't asked when crt.sh has the answer", async () => {
+      const d = uniq();
+      const calls = mockNet({ ...goodDomain(d), certspotter: [[issuance([d], -1, 89)]] });
+      expect(byId(await runReport(d, deps)).cert.facts).toContainEqual({ label: "Source", value: "crt.sh" });
+      expect(calls.some((u) => u.startsWith("https://api.certspotter.com/"))).toBe(false);
+    });
+  });
+
   it("doesn't grade or cache an empty crt.sh answer", async () => {
     const d = uniq();
     mockNet({ ...goodDomain(d), crtsh: [] });
     expect(byId(await runReport(d, deps)).cert.status).toBe("skipped");
-    expect(await env.VERDICTS.get(`cert:v1:${await sha256Hex(d)}`)).toBeNull();
+    expect(await env.VERDICTS.get(`cert:v2:${await sha256Hex(d)}`)).toBeNull();
   });
 
   it("flags broken DNSSEC", async () => {

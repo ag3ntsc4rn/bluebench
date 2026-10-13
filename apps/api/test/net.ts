@@ -26,6 +26,8 @@ export interface FakeNet {
   sites?: Record<string, Site>;
   /** crt.sh JSON rows, or a status code to fail with. */
   crtsh?: object[] | number;
+  /** Cert Spotter pages of issuances (the fake adds the final empty page), or a status code. Default: nothing. */
+  certspotter?: object[][] | number;
   /** Answer anything else (Resend, push services, …); return undefined to fall through. */
   handle?: (req: Request, url: URL) => Response | undefined | Promise<Response | undefined>;
 }
@@ -51,6 +53,13 @@ export function mockNet(net: FakeNet) {
     if (url.hostname === "crt.sh") {
       if (typeof net.crtsh === "number") return new Response("busy", { status: net.crtsh });
       return Response.json(net.crtsh ?? []);
+    }
+    if (url.hostname === "api.certspotter.com") {
+      if (typeof net.certspotter === "number") return new Response("nope", { status: net.certspotter });
+      const pages = net.certspotter ?? [];
+      const after = url.searchParams.get("after");
+      const i = after === null ? 0 : pages.findIndex((p) => (p.at(-1) as { id?: string } | undefined)?.id === after) + 1;
+      return Response.json(pages[i] ?? []);
     }
     const handled = await net.handle?.(req, url);
     if (handled) return handled;

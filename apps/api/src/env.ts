@@ -32,6 +32,8 @@ export interface Env {
   BETTER_AUTH_SECRET?: string;
   /** Resend API key for magic links and alert emails. Missing = accounts switched off (no way to sign in). */
   RESEND_API_KEY?: string;
+  /** SSLMate Cert Spotter API key: the certificate check's fallback when crt.sh fails. Missing = crt.sh only. */
+  CERTSPOTTER_API_KEY?: string;
   /** Web Push VAPID private key (base64url, 32 bytes). */
   VAPID_PRIVATE_KEY?: string;
 }

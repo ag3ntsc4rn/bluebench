@@ -25,6 +25,20 @@ describe("ProviderQuota", () => {
     expect(await q.acquire("urlhaus", "user", DAY1 + Math.ceil(MIN / perMinute))).toEqual({ ok: true });
   });
 
+  it("grants several calls at once, all or nothing, within the burst (Cert Spotter's pages)", async () => {
+    const q = quota();
+    const { perMinute, burst } = PROVIDER_LIMITS.certspotter;
+    expect(burst).toBe(4);
+    expect(perMinute * 60).toBeLessThanOrEqual(100); // the free plan's hourly limit
+    expect(await q.acquire("certspotter", "user", DAY1, 2)).toEqual({ ok: true });
+    expect(await q.acquire("certspotter", "user", DAY1, 2)).toEqual({ ok: true });
+    expect(await q.acquire("certspotter", "user", DAY1, 1)).toEqual({ ok: false, reason: "rate" });
+    // 1.5 a minute: two calls back after 80 seconds.
+    expect(await q.acquire("certspotter", "user", DAY1 + 80_000, 2)).toEqual({ ok: true });
+    const [row] = await runInDurableObject(q, (_o, state) => state.storage.sql.exec("SELECT total FROM daily").toArray());
+    expect(row).toEqual({ total: 6 });
+  });
+
   it("caps anonymous traffic at its share of the daily budget, leaving the rest for signed-in users", async () => {
     const q = quota();
     const anonCap = Math.floor(PROVIDER_LIMITS.threatfox.perDay * ANON_SHARE);

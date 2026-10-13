@@ -5,18 +5,22 @@ import type { Env } from "./env.ts";
 export type Tier = "anon" | "user";
 
 export interface ProviderLimits {
-  /** Steady per-minute rate (token bucket refill); also the burst size. */
+  /** Steady per-minute rate (token bucket refill). */
   perMinute: number;
+  /** Bucket size: the most calls in a burst. Defaults to perMinute. */
+  burst?: number;
   /** Upstream calls per UTC day. */
   perDay: number;
 }
 
-/** Everything with a ProviderQuota instance: the lookup sources, plus crt.sh for domain reports. */
-export type QuotaKey = SourceId | "crtsh";
+/** Everything with a ProviderQuota instance: the lookup sources, plus the CT search services for domain reports. */
+export type QuotaKey = SourceId | "crtsh" | "certspotter";
 
 /**
  * Kept well inside each provider's terms: abuse.ch asks for modest volume; Safe Browsing's default
  * quota is 10k/day; crt.sh publishes no limit but asks for restraint (~5/min), and results are cached 24 h.
+ * Cert Spotter (only when crt.sh fails): its free plan allows 100 single-hostname queries an hour; we use
+ * at most 90, counting each page of a check.
  */
 export const PROVIDER_LIMITS: Readonly<Record<QuotaKey, ProviderLimits>> = {
   urlhaus: { perMinute: 30, perDay: 3000 },
@@ -24,6 +28,7 @@ export const PROVIDER_LIMITS: Readonly<Record<QuotaKey, ProviderLimits>> = {
   malwarebazaar: { perMinute: 30, perDay: 3000 },
   safebrowsing: { perMinute: 60, perDay: 8000 },
   crtsh: { perMinute: 5, perDay: 1000 },
+  certspotter: { perMinute: 1.5, burst: 4, perDay: 2000 },
 };
 
 /** Anonymous traffic may spend at most this share of a provider's daily budget. */
@@ -55,27 +60,30 @@ export class ProviderQuota extends DurableObject<Env> {
     );
   }
 
-  acquire(source: QuotaKey, tier: Tier, now = Date.now()): { ok: true } | { ok: false; reason: QuotaDenial } {
+  /** Permission for `cost` upstream calls at once (all or nothing). */
+  acquire(source: QuotaKey, tier: Tier, now = Date.now(), cost = 1): { ok: true } | { ok: false; reason: QuotaDenial } {
     const limits = PROVIDER_LIMITS[source];
     const day = utcDay(now);
     const sql = this.ctx.storage.sql;
     const row = sql.exec<{ total: number; anon: number }>("SELECT total, anon FROM daily WHERE day = ?", day).toArray()[0];
     const total = row?.total ?? 0;
     const anon = row?.anon ?? 0;
-    if (total >= limits.perDay) return { ok: false, reason: "daily" };
-    if (tier === "anon" && anon >= Math.floor(limits.perDay * ANON_SHARE)) return { ok: false, reason: "daily" };
+    if (total + cost > limits.perDay) return { ok: false, reason: "daily" };
+    if (tier === "anon" && anon + cost > Math.floor(limits.perDay * ANON_SHARE)) return { ok: false, reason: "daily" };
 
+    const burst = limits.burst ?? limits.perMinute;
     const perMs = limits.perMinute / 60_000;
-    this.tokens = Math.min(limits.perMinute, (this.tokens ?? limits.perMinute) + (now - this.refilledAt) * perMs);
+    this.tokens = Math.min(burst, (this.tokens ?? burst) + (now - this.refilledAt) * perMs);
     this.refilledAt = now;
-    if (this.tokens < 1) return { ok: false, reason: "rate" };
-    this.tokens -= 1;
+    if (this.tokens < cost) return { ok: false, reason: "rate" };
+    this.tokens -= cost;
 
     sql.exec(
-      `INSERT INTO daily (day, total, anon) VALUES (?, 1, ?)
-       ON CONFLICT(day) DO UPDATE SET total = total + 1, anon = anon + excluded.anon`,
+      `INSERT INTO daily (day, total, anon) VALUES (?, ?, ?)
+       ON CONFLICT(day) DO UPDATE SET total = total + excluded.total, anon = anon + excluded.anon`,
       day,
-      tier === "anon" ? 1 : 0,
+      cost,
+      tier === "anon" ? cost : 0,
     );
     if (!row) sql.exec("DELETE FROM daily WHERE day < ?", day); // first call of a new day: drop old rows
     return { ok: true };

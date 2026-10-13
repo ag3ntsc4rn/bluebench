@@ -5,6 +5,7 @@ SESSION_SECRET=dev-only-change-me
 # Optional: real keys to try live lookups locally. Leave unset to see sources "not switched on".
 # ABUSECH_AUTH_KEY=
 # SAFE_BROWSING_API_KEY=
+# CERTSPOTTER_API_KEY=       # fallback for certificate checks when crt.sh is down
 # Accounts (magic-link sign-in) need these. Run `pnpm --filter @bluebench/api db:migrate:local` first.
 # BETTER_AUTH_SECRET=dev-only-change-me-to-32-or-more-characters
 # RESEND_API_KEY=            # real key: sign-in emails are really sent

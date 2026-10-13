@@ -54,7 +54,7 @@ export function AboutPage() {
         <p>
           Reputation lookups use abuse.ch (URLhaus, ThreatFox and MalwareBazaar) and Google Safe Browsing, within each
           source's terms. With your own keys you can add VirusTotal, AbuseIPDB, GreyNoise and AlienVault OTX. Domain checks
-          read public DNS through Cloudflare's 1.1.1.1 and certificates from crt.sh. A result of "not listed" means just
+          read public DNS through Cloudflare's 1.1.1.1 and certificates from crt.sh or SSLMate's Cert Spotter. A result of "not listed" means just
           that: it's never a promise that something is safe.
         </p>
       </Section>

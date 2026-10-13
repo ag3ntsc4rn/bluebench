@@ -18,6 +18,7 @@ describe("PrivacyPage", () => {
   it("explains what a domain check contacts and stores", () => {
     expect(html).toContain("Check domain");
     expect(html).toContain("https://www.sectigo.com/privacy-policy");
+    expect(html).toContain("https://sslmate.com/policies/privacy");
     expect(html).toContain("never scans ports");
     expect(html).toContain("Domain reports");
   });
