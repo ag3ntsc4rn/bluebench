@@ -1,6 +1,8 @@
-import { matchesKev, RECENT_DAYS, type ApiError, type KevEntry, type KevResponse } from "@bluebench/shared";
-import { useEffect, useId, useState } from "react";
+import { kevVendors, matchesKev, RECENT_DAYS, watchMatches, type ApiError, type KevEntry, type KevResponse, type Watch } from "@bluebench/shared";
+import { useEffect, useId, useMemo, useState } from "react";
 import { Badge, WhatsThis } from "../components/ui";
+import { Watchlist } from "../components/Watchlist";
+import { addWatch, listWatches, removeWatch, useAccount } from "../lib/account";
 import { fetchKev } from "../lib/api";
 import { EPSS_EXPLAINER, KEV_EXPLAINER } from "../lib/explainers";
 
@@ -10,7 +12,10 @@ const PAGE = 30;
 const date = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString(undefined, { dateStyle: "medium", timeZone: "UTC" });
 const pct = (p: number) => (p >= 0.995 ? ">99%" : p < 0.01 ? "<1%" : `${Math.round(p * 100)}%`);
 
-function Entry({ e }: { e: KevEntry }) {
+/** Signed in: whether this entry's product is already watched, and how to watch it. */
+type WatchControl = { watched: boolean; onWatch: () => void };
+
+function Entry({ e, watch }: { e: KevEntry; watch?: WatchControl }) {
   return (
     <li className="space-y-2 rounded-lg border border-border bg-surface p-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -46,6 +51,16 @@ function Entry({ e }: { e: KevEntry }) {
         )}
       </p>
       {e.due && <p className="text-xs text-muted">CISA deadline for US federal agencies: {date(e.due)}</p>}
+      {watch &&
+        (watch.watched ? (
+          <p className="flex min-h-11 items-center gap-2 text-sm text-muted">
+            <Badge tone="ok">Watching</Badge> You'll be alerted about new entries for {e.vendor} {e.product}.
+          </p>
+        ) : (
+          <button type="button" onClick={watch.onWatch} className="min-h-11 rounded-md border border-border px-3 text-sm text-muted hover:text-fg">
+            Watch {e.vendor} {e.product}
+          </button>
+        ))}
     </li>
   );
 }
@@ -61,10 +76,33 @@ export function IntelPage() {
   const [query, setQuery] = useState("");
   const [shown, setShown] = useState(PAGE);
   const [older, setOlder] = useState(false);
+  const me = useAccount();
+  const [watches, setWatches] = useState<Watch[] | null>(null);
 
   useEffect(() => {
     void fetchKev("recent").then((res) => setRecent(res.ok ? { phase: "ready", doc: res } : { phase: "error", error: res }));
   }, []);
+
+  const signedIn = me?.signedIn === true;
+  const refreshWatches = async (): Promise<string | null> => {
+    const res = await listWatches();
+    if (!res.ok) return res.message;
+    setWatches(res.watches);
+    return null;
+  };
+  useEffect(() => {
+    if (signedIn) void refreshWatches();
+  }, [signedIn]);
+
+  // The server may drop single-product watches covered by a new vendor watch, so reload the list after a change.
+  const onAdd = async (vendor: string, product: string | null) => {
+    const res = await addWatch(vendor, product);
+    return res.ok ? refreshWatches() : res.message;
+  };
+  const onRemove = async (id: string) => {
+    const res = await removeWatch(id);
+    return res.ok ? refreshWatches() : res.message;
+  };
 
   const loadAll = () => {
     if (all) return;
@@ -76,6 +114,9 @@ export function IntelPage() {
   const source = (searching || older) && all ? all : recent;
   const doc = source.phase === "ready" ? source.doc : null;
   const matches = doc ? doc.entries.filter((e) => matchesKev(e, query)) : [];
+  const vendors = useMemo(() => (all?.phase === "ready" ? kevVendors(all.doc.entries) : null), [all]);
+  const watchControl = (e: KevEntry): WatchControl | undefined =>
+    signedIn && watches ? { watched: watches.some((w) => watchMatches(w, e)), onWatch: () => void onAdd(e.vendor, e.product) } : undefined;
 
   return (
     <section aria-labelledby="intel-heading" className="space-y-4">
@@ -89,6 +130,8 @@ export function IntelPage() {
         </p>
         <WhatsThis>{KEV_EXPLAINER}</WhatsThis>
       </div>
+
+      <Watchlist me={me} watches={watches} vendors={vendors} onNeedVendors={loadAll} onAdd={onAdd} onRemove={onRemove} />
 
       <div>
         <label htmlFor={searchId} className="block text-sm font-medium">
@@ -135,7 +178,7 @@ export function IntelPage() {
       {doc && (
         <ul className="space-y-3">
           {matches.slice(0, shown).map((e) => (
-            <Entry key={e.cve} e={e} />
+            <Entry key={e.cve} e={e} watch={watchControl(e)} />
           ))}
         </ul>
       )}

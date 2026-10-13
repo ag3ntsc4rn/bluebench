@@ -40,8 +40,8 @@ export function PrivacyPage() {
           </li>
           <li>We set a cookie only when you use something that needs it: a lookup or domain check, or signing in.</li>
           <li>
-            An account is optional. It holds your email address, the domains you save and your alerts, and you can delete it
-            yourself at any time.
+            An account is optional. It holds your email address, the domains you save, the products you watch and your
+            alerts, and you can delete it yourself at any time.
           </li>
         </ul>
       </Section>
@@ -59,6 +59,10 @@ export function PrivacyPage() {
             <strong>The domains you save</strong> (up to 5), a random verification code for each, and the latest daily
             result: the grade, each check's status, the certificate's expiry date, and any lookalike domains found with a
             website or mail (the name, which of the two it has, and when we first saw it).
+          </li>
+          <li>
+            <strong>The vendors and products you watch</strong> on the Intel tab (up to 25). Once an hour our server compares
+            them with newly listed exploited vulnerabilities; nothing about your watchlist is sent to anyone else.
           </li>
           <li>
             <strong>Your alerts</strong> (for example "grade dropped from A to C"), kept for 180 days so you can see them on

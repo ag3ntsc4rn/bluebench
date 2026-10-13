@@ -106,7 +106,7 @@ export interface LookalikeHit {
   firstSeenAt: string;
 }
 
-export type AlertKind = "grade-drop" | "cert-expiry" | "verification-lost" | "lookalike" | "test";
+export type AlertKind = "grade-drop" | "cert-expiry" | "verification-lost" | "lookalike" | "kev" | "test";
 
 export interface AlertItem {
   id: string;

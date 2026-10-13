@@ -165,3 +165,45 @@ export function matchesKev(e: KevEntry, query: string): boolean {
   if (!q) return true;
   return [e.vendor, e.product, e.cve, e.name].some((f) => f.toLowerCase().includes(q));
 }
+
+/** Products an account can watch for new known exploited vulnerabilities. */
+export const MAX_WATCHES = 25;
+
+/** Watch a vendor (all its products, product null) or one product, by KEV's own names. */
+export const WatchSchema = z.strictObject({
+  vendor: z.string().trim().min(1).max(100),
+  product: z.string().trim().min(1).max(150).nullable(),
+});
+export type WatchInput = z.infer<typeof WatchSchema>;
+
+export interface Watch {
+  id: string;
+  vendor: string;
+  /** null = every product from this vendor. */
+  product: string | null;
+  createdAt: string;
+}
+
+export interface WatchesResponse {
+  ok: true;
+  watches: Watch[];
+}
+
+/** KEV names are matched case-insensitively, exactly otherwise ("Microsoft" + "Exchange Server"). */
+export const watchKey = (s: string) => s.trim().toLowerCase();
+
+export function watchMatches(w: { vendor: string; product: string | null }, e: { vendor: string; product: string }): boolean {
+  return watchKey(w.vendor) === watchKey(e.vendor) && (w.product === null || watchKey(w.product) === watchKey(e.product));
+}
+
+/** Vendors and their products, as KEV names them, for the watchlist picker. Sorted, case-insensitively unique. */
+export function kevVendors(entries: readonly { vendor: string; product: string }[]): { vendor: string; products: string[] }[] {
+  const byVendor = new Map<string, { vendor: string; products: Map<string, string> }>();
+  for (const e of entries) {
+    const v = byVendor.get(watchKey(e.vendor)) ?? { vendor: e.vendor, products: new Map() };
+    if (!v.products.has(watchKey(e.product))) v.products.set(watchKey(e.product), e.product); // first spelling wins
+    byVendor.set(watchKey(e.vendor), v);
+  }
+  const sort = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: "base" });
+  return [...byVendor.values()].map((v) => ({ vendor: v.vendor, products: [...v.products.values()].sort(sort) })).sort((a, b) => sort(a.vendor, b.vendor));
+}

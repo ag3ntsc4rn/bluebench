@@ -163,3 +163,33 @@ export const pushSubscription = sqliteTable(
   },
   (t) => [index("push_subscription_user_id").on(t.userId)],
 );
+
+/** A vendor (product null) or product an account watches for new known exploited vulnerabilities. */
+export const watch = sqliteTable(
+  "watch",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** As KEV names it, for display. */
+    vendor: text("vendor").notNull(),
+    product: text("product"),
+    /** Lowercased vendor, for matching new KEV entries. */
+    vendorKey: text("vendor_key").notNull(),
+    createdAt: time("created_at").notNull(),
+  },
+  (t) => [index("watch_user").on(t.userId), index("watch_vendor_key").on(t.vendorKey)],
+);
+
+/** KEV entries the watchlist cron has already handled, so each one alerts at most once. Pruned after 120 days. */
+export const kevSeen = sqliteTable("kev_seen", {
+  cve: text("cve").primaryKey(),
+  seenAt: time("seen_at").notNull(),
+});
+
+/** Small key/value state for the intel cron (e.g. the KEV document version last processed). */
+export const intelState = sqliteTable("intel_state", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+});

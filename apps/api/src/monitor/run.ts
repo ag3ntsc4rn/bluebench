@@ -8,6 +8,7 @@ import { runReport } from "../domain/report.ts";
 import type { Env } from "../env.ts";
 import { sendMail, takeEmailQuota } from "../mail.ts";
 import { sendPush, type PushMessage, type VapidKeys } from "../push.ts";
+import { checkKev, pruneKevSeen } from "./kev.ts";
 import { lookalikeAlert, scanLookalikes } from "./lookalike.ts";
 import { certAlert, certAlertDays, gradeDropAlert, hasGradedChecks, mergeStatuses, verificationLostAlert, type AlertText } from "./rules.ts";
 import { hasVerifyRecord, verifyRecord } from "./verify.ts";
@@ -31,7 +32,7 @@ export interface TickDeps {
   waitUntil(p: Promise<unknown>): void;
 }
 
-export type TickResult = "off" | "delivered" | "checked" | "lookalikes" | "idle";
+export type TickResult = "off" | "delivered" | "intel" | "checked" | "lookalikes" | "idle";
 
 export function vapidKeys(env: Env): VapidKeys | null {
   if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return null;
@@ -43,6 +44,8 @@ export function vapidKeys(env: Env): VapidKeys | null {
  * 1. deliver pending alerts, else
  * 2. re-check the domain that's most overdue (each verified domain once a day), else
  * 3. scan the next chunk of a domain's lookalikes (a full scan of ~120 names takes about 3 runs, daily).
+ * At minute 30 of each hour, step 2 and 3 give way to the watchlist check (new known exploited
+ * vulnerabilities against accounts' watched products), which is cheap when nothing changed.
  * A verified domain costs about 4 runs a day, so 1,440 runs cover roughly 350 domains.
  */
 export async function tick(env: Env, deps: TickDeps): Promise<TickResult> {
@@ -54,6 +57,11 @@ export async function tick(env: Env, deps: TickDeps): Promise<TickResult> {
   if (pending.length > 0) {
     await deliverAlerts(env, d, pending, now);
     return "delivered";
+  }
+
+  if (new Date(now).getUTCMinutes() === 30) {
+    await checkKev(env, d, now);
+    return "intel";
   }
 
   const [due] = await d
@@ -192,13 +200,11 @@ export async function pushToUser(d: Db, subs: Sub[], msg: PushMessage, keys: Vap
 }
 
 function alertEmail(env: Env, a: AlertRow): string {
-  return [
-    a.body,
-    "",
-    `All alerts: ${env.SITE_ORIGIN}/alerts`,
-    "",
-    `You get these emails because you saved ${a.domain ?? "a domain"} on Bluebench and push notifications aren't switched on. Turn email alerts off, or delete your account, at ${env.SITE_ORIGIN}/alerts.`,
-  ].join("\n");
+  const why =
+    a.kind === "kev"
+      ? `You get these emails because you watch products on Bluebench's Intel tab and push notifications aren't switched on. Change your watchlist at ${env.SITE_ORIGIN}/exploited-vulnerabilities.`
+      : `You get these emails because you saved ${a.domain ?? "a domain"} on Bluebench and push notifications aren't switched on.`;
+  return [a.body, "", `All alerts: ${env.SITE_ORIGIN}/alerts`, "", `${why} Turn email alerts off, or delete your account, at ${env.SITE_ORIGIN}/alerts.`].join("\n");
 }
 
 /** Web Push to every device first; email only if no device got it (and the user allows email). */
@@ -235,5 +241,6 @@ async function housekeeping(d: Db, now: number): Promise<void> {
     d.delete(alert).where(lt(alert.createdAt, new Date(now - ALERT_RETENTION_MS))),
     d.delete(verification).where(lt(verification.expiresAt, at)),
     d.delete(session).where(lt(session.expiresAt, at)),
+    pruneKevSeen(d, now),
   ]);
 }
