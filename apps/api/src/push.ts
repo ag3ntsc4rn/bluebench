@@ -14,7 +14,10 @@ export function b64urlEncode(bytes: Uint8Array): string {
 }
 
 export function b64urlDecode(text: string): Uint8Array {
-  const b64 = text.replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/, "");
+  // Trim padding with a loop: /=+$/ backtracks quadratically on long runs of "=" (CodeQL js/polynomial-redos).
+  let end = text.length;
+  while (end > 0 && text[end - 1] === "=") end--;
+  const b64 = text.slice(0, end).replace(/-/g, "+").replace(/_/g, "/");
   const bin = atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4));
   return Uint8Array.from(bin, (c) => c.charCodeAt(0));
 }
