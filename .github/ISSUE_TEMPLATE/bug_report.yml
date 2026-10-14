@@ -1,0 +1,56 @@
+name: Bug report
+description: Something on bluebench.dev doesn't work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Security problems go to [private vulnerability reporting](https://github.com/ag3ntsc4rn/bluebench/security/advisories/new), not here.**
+
+        This issue is public. Don't paste real indicators, email headers, tokens, API keys or anything from an incident. Describe the shape of the input instead (for example "a SHA-256 hash", "headers from an Outlook message"), or use made-up values.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where
+      options:
+        - Lookup (paste box, reputation check)
+        - Email header analyser
+        - Decoders (JWT, base64, URL) or IOC extractor
+        - Domain report card
+        - Accounts, saved domains or alerts
+        - Respond (runbooks)
+        - Intel (exploited vulnerabilities)
+        - Settings or own API keys
+        - Installing or updating the app
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open …
+        2. Paste … (made-up value)
+        3. Press …
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Browser and device
+      placeholder: e.g. Firefox 140 on Windows 11, Safari on iPhone (installed app)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Shown at the bottom of Settings.
+      placeholder: e.g. 1a2b3c4 (2026-10-14)

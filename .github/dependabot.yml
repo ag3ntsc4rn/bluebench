@@ -1,0 +1,22 @@
+# Weekly version updates, with minor and patch bumps grouped into one PR per ecosystem. Majors arrive as
+# separate PRs. Security updates (enabled in the repo settings) still open straight away.
+version: 2
+updates:
+  - package-ecosystem: npm # covers the pnpm workspace: root, apps/* and packages/* share pnpm-lock.yaml
+    directory: /
+    schedule:
+      interval: weekly
+    labels: [dependencies]
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels: [dependencies]
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]

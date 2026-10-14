@@ -1,0 +1,40 @@
+name: Feature request
+description: Suggest a new tool or an improvement.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Bluebench stays small, free and on Cloudflare's free tier, and plenty of good free security tools already exist. The best requests explain what Bluebench would add that those don't.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve, and for whom?
+      placeholder: e.g. "When triaging a phishing report on my phone, I can't …"
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like Bluebench to do?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What do you use today, and why isn't it enough?
+      description: Other free tools or services that already do this, and what's missing from them.
+    validations:
+      required: true
+  - type: textarea
+    id: data
+    attributes:
+      label: Data and privacy
+      description: Would it need a new data source, a server-side call, or anything stored? If it uses an outside service, link its terms of use.
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Principles
+      options:
+        - label: I've read the non-negotiables in CONTRIBUTING.md (nothing pasted is logged, browser first, free forever).
+          required: true
