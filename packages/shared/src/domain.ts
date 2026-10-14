@@ -37,9 +37,41 @@ const MULTI_LABEL_SUFFIXES = new Set([
   "co.kr", "or.kr", "co.il", "org.il", "co.id", "or.id", "co.th", "in.th",
 ]);
 
-/** Approximate organizational domain (eTLD+1), used for DMARC-style alignment checks. */
+/**
+ * Shared-hosting and SaaS-tenant suffixes: anyone can get a name under these, so "victim.github.io" and
+ * "evil.github.io" are different organisations. Curated from the Public Suffix List's private section
+ * (the platforms phishing actually uses), plus tenant domains the list leaves out (onmicrosoft.com,
+ * sharepoint.com, …). Not the full list: that would add ~42 KB to every page for a long tail of rare hosts.
+ */
+export const SHARED_HOSTING_SUFFIXES: ReadonlySet<string> = new Set([
+  // Static hosting and app platforms
+  "github.io", "gitlab.io", "pages.dev", "workers.dev", "r2.dev", "netlify.app", "vercel.app", "herokuapp.com",
+  "firebaseapp.com", "firebaseio.com", "web.app", "appspot.com", "glitch.me", "repl.co", "replit.app", "onrender.com",
+  "fly.dev", "up.railway.app", "ondigitalocean.app", "pythonanywhere.com", "surge.sh", "neocities.org", "csb.app",
+  "app.github.dev", "amplifyapp.com", "000webhostapp.com",
+  // Site builders and blogs
+  "blogspot.com", "wordpress.com", "wixsite.com", "weebly.com", "square.site", "myshopify.com", "webflow.io",
+  "carrd.co", "notion.site", "framer.website", "godaddysites.com", "mystrikingly.com",
+  // Cloud storage and CDNs
+  "azurewebsites.net", "azurestaticapps.net", "cloudapp.net", "blob.core.windows.net", "web.core.windows.net",
+  "cloudfront.net", "s3.amazonaws.com",
+  // Tunnels and dynamic DNS
+  "ngrok.io", "ngrok-free.app", "ngrok.app", "trycloudflare.com", "loca.lt", "serveo.net", "duckdns.org", "ddns.net",
+  "hopto.org", "zapto.org", "translate.goog",
+  // SaaS tenants (each subdomain is a different customer)
+  "onmicrosoft.com", "sharepoint.com", "my.salesforce.com", "force.com", "atlassian.net", "zendesk.com", "freshdesk.com",
+]);
+
+/**
+ * Approximate organizational (registrable) domain: one label below the longest known suffix. Used for
+ * alignment checks in the header analyzer, lookalike generation and the self-zone check. A heuristic, not
+ * the full Public Suffix List; DMARC policy discovery uses RFC 9989's DNS tree walk instead.
+ */
 export function orgDomain(domain: string): string {
   const labels = domain.toLowerCase().replace(/\.$/, "").split(".");
-  const take = labels.length >= 3 && MULTI_LABEL_SUFFIXES.has(labels.slice(-2).join(".")) ? 3 : 2;
-  return labels.slice(-take).join(".");
+  for (let k = Math.min(labels.length - 1, 4); k >= 2; k--) {
+    const suffix = labels.slice(-k).join(".");
+    if (SHARED_HOSTING_SUFFIXES.has(suffix) || MULTI_LABEL_SUFFIXES.has(suffix)) return labels.slice(-(k + 1)).join(".");
+  }
+  return labels.slice(-2).join(".");
 }

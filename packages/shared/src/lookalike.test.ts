@@ -63,4 +63,10 @@ describe("lookalikes", () => {
   it("returns nothing for something that isn't a domain", () => {
     expect(lookalikes("not a domain")).toEqual([]);
   });
+
+  it("mutates a hosting tenant's own name, not the platform's (#30)", () => {
+    const all = names("victim.github.io");
+    expect(all).toContain("v1ctim.github.io");
+    expect(all.some((d) => d.startsWith("gith"))).toBe(false);
+  });
 });

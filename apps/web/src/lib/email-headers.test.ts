@@ -121,7 +121,23 @@ describe("analyzeHeaders", () => {
     expect(a.findings).toEqual([]);
   });
 
-  it("flags a spoofed message", () => {
+  it("treats tenants of a shared hosting platform as different senders (#30)", () => {
+    const headers = (from: string, replyTo: string) =>
+      [
+        "Authentication-Results: mx.example.org; spf=pass smtp.mailfrom=" + from.split("@")[1] + "; dkim=pass header.d=" + from.split("@")[1] + "; dmarc=pass header.from=" + from.split("@")[1],
+        `From: ${from}`,
+        `Reply-To: ${replyTo}`,
+        "Subject: hello",
+        "Message-ID: <1@x>",
+      ].join("\n");
+    const titles = (from: string, replyTo: string) => analyzeHeaders(headers(from, replyTo)).findings.map((f) => f.title);
+    expect(titles("alice@victim.github.io", "attacker@evil.github.io")).toContain("Replies go somewhere else");
+    expect(titles("it@contoso.onmicrosoft.com", "help@attacker.onmicrosoft.com")).toContain("Replies go somewhere else");
+    // Same tenant, different subdomain: still the same organisation.
+    expect(titles("alice@victim.github.io", "bob@www.victim.github.io")).not.toContain("Replies go somewhere else");
+  });
+
+    it("flags a spoofed message", () => {
     const a = analyzeHeaders(PHISH);
     const titles = a.findings.map((f) => f.title);
     expect(titles).toEqual(

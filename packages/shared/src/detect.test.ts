@@ -154,4 +154,21 @@ describe("domains", () => {
     expect(orgDomain("bounce.shop.example.co.uk")).toBe("example.co.uk");
     expect(orgDomain("example.com")).toBe("example.com");
   });
+
+  it("keeps tenants of shared-hosting and SaaS platforms apart (#30)", () => {
+    for (const [a, b] of [
+      ["victim.github.io", "evil.github.io"],
+      ["victim.pages.dev", "evil.pages.dev"],
+      ["victim.blogspot.com", "evil.blogspot.com"],
+      ["contoso.onmicrosoft.com", "attacker.onmicrosoft.com"],
+      ["bucket.s3.amazonaws.com", "other.s3.amazonaws.com"],
+      ["files.blob.core.windows.net", "evil.blob.core.windows.net"],
+    ]) {
+      expect(orgDomain(a!)).toBe(a);
+      expect(orgDomain(b!)).not.toBe(orgDomain(a!));
+    }
+    expect(orgDomain("www.victim.github.io")).toBe("victim.github.io");
+    expect(orgDomain("github.io")).toBe("github.io");
+    expect(orgDomain("api.github.com")).toBe("github.com"); // github.com itself isn't a hosting suffix
+  });
 });

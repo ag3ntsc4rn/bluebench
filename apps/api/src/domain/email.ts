@@ -1,4 +1,4 @@
-import { base64ToBytes, orgDomain, parseIPv4, parseIPv6, type DomainCheck } from "@bluebench/shared";
+import { base64ToBytes, parseIPv4, parseIPv6, type DomainCheck } from "@bluebench/shared";
 import { BudgetExceeded, DNS_TYPES, type DnsAnswer, type Resolver } from "../dns.ts";
 
 type Check = Omit<DomainCheck, "id">;
@@ -261,13 +261,28 @@ const ONE_LOWER: Record<string, string> = { reject: "quarantine", quarantine: "n
 
 const isDmarc = (txt: string) => /^v=DMARC1\s*(;|$)/i.test(txt);
 
+/**
+ * Names to look for a DMARC record at, per RFC 9989's DNS tree walk (§4.10): the domain itself, then each
+ * parent up to (not including) the top-level domain. A name with more than 8 labels jumps to its last 7
+ * after the first query, as the RFC caps the walk.
+ */
+export function dmarcTreeWalk(domain: string): string[] {
+  const labels = domain.toLowerCase().replace(/\.$/, "").split(".");
+  const names = [labels.join(".")];
+  for (let i = labels.length > 8 ? labels.length - 7 : 1; i < labels.length - 1; i++) names.push(labels.slice(i).join("."));
+  return names;
+}
+
 export async function dmarcCheck(r: Resolver, domain: string, receivesMail: boolean): Promise<Check> {
+  // The first name up the tree with a DMARC record supplies the policy (subdomains then use its sp=).
   let at = domain;
-  let records = (await r.txt(`_dmarc.${domain}`)).filter(isDmarc);
-  const org = orgDomain(domain);
-  if (records.length === 0 && org !== domain) {
-    at = org; // receivers fall back to the organizational domain's policy
-    records = (await r.txt(`_dmarc.${org}`)).filter(isDmarc);
+  let records: string[] = [];
+  for (const name of dmarcTreeWalk(domain)) {
+    records = (await r.txt(`_dmarc.${name}`)).filter(isDmarc);
+    if (records.length > 0) {
+      at = name;
+      break;
+    }
   }
   const startFix = receivesMail
     ? `Add a TXT record at _dmarc.${domain}: v=DMARC1; p=none; rua=mailto:dmarc@${domain}. Watch the reports, then move to p=quarantine and p=reject.`
