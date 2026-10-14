@@ -4,6 +4,8 @@ A free, open-source security "Swiss Army knife" — [bluebench.dev](https://blue
 
 See [CLAUDE.md](CLAUDE.md) for the project brief, principles and roadmap.
 
+Want to help? Read [CONTRIBUTING.md](CONTRIBUTING.md). Found a security problem? Please report it privately: see [SECURITY.md](SECURITY.md).
+
 ## Layout
 
 ```

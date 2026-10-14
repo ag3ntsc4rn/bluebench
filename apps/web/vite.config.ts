@@ -1,9 +1,26 @@
 /// <reference types="vitest/config" />
+import { execFileSync } from "node:child_process";
 import { createServer, defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 import { formatHeadersFile } from "@bluebench/shared";
+
+/** The commit being built: short SHA and commit date (YYYY-MM-DD), or "unknown" outside a git checkout. */
+function buildVersion() {
+  const git = (...args: string[]) => {
+    try {
+      return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    } catch {
+      return "";
+    }
+  };
+  return { sha: git("rev-parse", "--short", "HEAD") || "unknown", date: git("log", "-1", "--format=%cs") || "unknown" };
+}
+
+// Shown on the Settings page (src/lib/version.ts). The prerender server needs it too.
+const version = buildVersion();
+const define = { __BUILD_SHA__: JSON.stringify(version.sha), __BUILD_DATE__: JSON.stringify(version.date) };
 
 /** Emit Cloudflare's `_headers` file so static assets get the same security headers as the API. */
 function securityHeaders(): Plugin {
@@ -37,6 +54,7 @@ function prerender(): Plugin {
         const server = await createServer({
           root,
           configFile: false,
+          define,
           logLevel: "error",
           plugins: [react()],
           server: { middlewareMode: true, hmr: false, ws: false },
@@ -59,6 +77,7 @@ function prerender(): Plugin {
 }
 
 export default defineConfig({
+  define,
   plugins: [
     react(),
     tailwindcss(),

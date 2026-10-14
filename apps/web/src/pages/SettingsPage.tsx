@@ -6,6 +6,7 @@ import { Badge, Panel } from "../components/ui";
 import { deleteAccount, signOut, useAccount } from "../lib/account";
 import { byoKeys, useByoKeys } from "../lib/byo-keys";
 import { disablePush } from "../lib/push";
+import { BUILD_VERSION } from "../lib/version";
 import { DONATE_URL, SOURCE_URL } from "../routes";
 
 type SignedIn = Extract<Me, { signedIn: true }>;
@@ -210,6 +211,24 @@ export function Support() {
   );
 }
 
+/** Which build this is, so a bug report can name it. Links to the commit when the SHA is known. */
+export function Version() {
+  const { sha, date, url } = BUILD_VERSION;
+  return (
+    <p className="text-sm text-muted">
+      Version{" "}
+      {url ? (
+        <Ext href={url}>
+          <span className="font-mono">{sha}</span>
+        </Ext>
+      ) : (
+        <span className="font-mono">{sha}</span>
+      )}{" "}
+      ({date})
+    </p>
+  );
+}
+
 export function SettingsPage() {
   return (
     <section aria-labelledby="settings-heading" className="space-y-4">
@@ -230,6 +249,7 @@ export function SettingsPage() {
           Privacy
         </AppLink>
       </p>
+      <Version />
     </section>
   );
 }
