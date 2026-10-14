@@ -1,7 +1,7 @@
 import { orgDomain } from "@bluebench/shared";
 import { and, asc, eq, gt, isNotNull, isNull, lt, lte, ne, or } from "drizzle-orm";
 import { accountsEnabled, db, type Db } from "../auth.ts";
-import { alert, domain, pushSubscription, session, user, verification } from "../db/schema.ts";
+import { alert, domain, intelState, pushSubscription, session, user, verification } from "../db/schema.ts";
 import { Budget, Resolver } from "../dns.ts";
 import { utc } from "../domain/cert.ts";
 import { runReport } from "../domain/report.ts";
@@ -33,7 +33,7 @@ export interface TickDeps {
   waitUntil(p: Promise<unknown>): void;
 }
 
-export type TickResult = "off" | "delivered" | "intel" | "watchdog" | "checked" | "lookalikes" | "idle";
+export type TickResult = "off" | "housekeeping" | "delivered" | "intel" | "watchdog" | "checked" | "lookalikes" | "idle";
 
 export function vapidKeys(env: Env): VapidKeys | null {
   if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return null;
@@ -42,6 +42,7 @@ export function vapidKeys(env: Env): VapidKeys | null {
 
 /**
  * One cron run (every minute), one job per run to stay well inside the subrequest and CPU limits:
+ * 0. retention cleanup, if the last one was over an hour ago (it must not wait for an idle run), else
  * 1. deliver pending alerts, else
  * 2. re-check the domain that's most overdue (each verified domain once a day), else
  * 3. scan the next chunk of a domain's lookalikes (a full scan of ~120 names takes about 3 runs, daily).
@@ -54,6 +55,12 @@ export async function tick(env: Env, deps: TickDeps): Promise<TickResult> {
   if (!accountsEnabled(env)) return "off";
   const now = deps.now ?? Date.now();
   const d = db(env);
+
+  // Retention cleanup can't wait for an idle run: under a steady backlog it would never happen.
+  if (await housekeepingDue(d, now)) {
+    await housekeeping(d, now);
+    return "housekeeping";
+  }
 
   const pending = await d.select().from(alert).where(isNull(alert.deliveredAt)).orderBy(asc(alert.createdAt)).limit(PENDING_BATCH);
   if (pending.length > 0) {
@@ -98,7 +105,6 @@ export async function tick(env: Env, deps: TickDeps): Promise<TickResult> {
     return "lookalikes";
   }
 
-  if (new Date(now).getUTCMinutes() === 0) await housekeeping(d, now);
   return "idle";
 }
 
@@ -241,10 +247,22 @@ async function deliverAlerts(env: Env, d: Db, pending: AlertRow[], now: number):
   }
 }
 
-/** Once an hour when there's nothing else to do: drop old alerts, expired magic links and sessions. */
-async function housekeeping(d: Db, now: number): Promise<void> {
+const HOUSEKEEPING_KEY = "housekeeping_at";
+
+/** Due when the last successful cleanup was over an hour ago (or never). */
+async function housekeepingDue(d: Db, now: number): Promise<boolean> {
+  const [row] = await d.select().from(intelState).where(eq(intelState.key, HOUSEKEEPING_KEY));
+  return !row || now - Number(row.value) >= HOUR_MS;
+}
+
+/**
+ * Hourly, ahead of any other work: drop old alerts, expired magic links and sessions, and old KEV
+ * markers. The timestamp is written in the same batch, so a failed cleanup stays due and is retried.
+ */
+export async function housekeeping(d: Db, now: number): Promise<void> {
   const at = new Date(now);
   await d.batch([
+    d.insert(intelState).values({ key: HOUSEKEEPING_KEY, value: String(now) }).onConflictDoUpdate({ target: intelState.key, set: { value: String(now) } }),
     d.delete(alert).where(lt(alert.createdAt, new Date(now - ALERT_RETENTION_MS))),
     d.delete(verification).where(lt(verification.expiresAt, at)),
     d.delete(session).where(lt(session.expiresAt, at)),
