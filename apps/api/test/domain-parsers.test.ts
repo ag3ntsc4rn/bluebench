@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { covers, judgeCerts, toCertEntries } from "../src/domain/cert.ts";
-import { dkimKeyBits, parseDmarc, parseSpf } from "../src/domain/email.ts";
+import { parseDkimKey, parseDmarc, parseSpf, parseTagList, spfSendsNoMail, spfSyntaxError } from "../src/domain/email.ts";
 import { parseHsts } from "../src/domain/web.ts";
+import { ED25519_RAW, RSA1024_SPKI, RSA2048_PKCS1, RSA2048_SPKI } from "./keys.ts";
 import { joinTxt } from "../src/dns.ts";
 
 const DAY = 86_400_000;
@@ -36,24 +37,91 @@ describe("parseDmarc", () => {
   });
 });
 
-describe("dkimKeyBits", () => {
-  it.each([
-    [216, 1024],
-    [392, 2048],
-    [736, 4096],
-  ])("base64 length %i ≈ %i-bit RSA", (len, bits) => {
-    expect(dkimKeyBits("A".repeat(len))).toBe(bits);
-  });
-  it("reports revoked and Ed25519 keys", () => {
-    expect(dkimKeyBits("")).toBe(0);
-    expect(dkimKeyBits("A".repeat(44), "ed25519")).toBe(256);
+describe("parseTagList", () => {
+  it("reports repeated tags instead of letting the last one win (#33)", () => {
+    expect(parseTagList("v=DMARC1; p=none; p=reject").duplicates).toEqual(["p"]);
+    expect(parseTagList("v=DMARC1; p=none; p=reject").tags.get("p")).toBe("none");
+    expect(parseTagList("v=DMARC1; p=reject; rua=mailto:a@b.example").duplicates).toEqual([]);
   });
 });
 
-describe("parseHsts", () => {
+describe("spfSyntaxError (#34)", () => {
+  it.each([
+    "v=spf1 ip4:not-an-ip -all",
+    "v=spf1 ip4:999.999.999.999 -all",
+    "v=spf1 include: -all",
+    "v=spf1 definitely-not-a-mechanism -all",
+    "v=spf1 ip4:192.0.2.0/33 -all",
+    "v=spf1 ip6:2001:db8::/129 -all",
+    "v=spf1 all:x",
+    "v=spf1 redirect=a.example redirect=b.example",
+    "v=spf1 a:/24 -all",
+  ])("rejects %s", (record) => {
+    expect(spfSyntaxError(record)).not.toBeNull();
+  });
+
+  it.each([
+    "v=spf1 ip4:192.0.2.0/24 ip6:2001:db8::/32 include:_spf.google.com -all",
+    "v=spf1 a mx a:mail.example.com/24 mx//64 -all",
+    "v=spf1 -a/24//64 ~all",
+    "v=spf1 exists:%{i}._spf.example.com -all",
+    "v=spf1 include:%{d}.spf.example.net ?all",
+    "v=spf1 ptr -all",
+    "v=spf1 redirect=_spf.example.com",
+    "v=spf1 exp=explain._spf.%{d} unknown-mod=whatever -all",
+    "v=spf1 -all",
+  ])("accepts %s", (record) => {
+    expect(spfSyntaxError(record)).toBeNull();
+  });
+});
+
+describe("spfSendsNoMail (#31)", () => {
+  it("is true only for an explicit v=spf1 -all", () => {
+    expect(spfSendsNoMail(["v=spf1 -all"])).toBe(true);
+    expect(spfSendsNoMail(["other", "v=spf1  -all "])).toBe(true);
+    expect(spfSendsNoMail(["v=spf1 include:_spf.example.com -all"])).toBe(false);
+    expect(spfSendsNoMail([])).toBe(false);
+  });
+});
+
+describe("parseDkimKey (#38)", () => {
+  it("reads the real RSA size from SubjectPublicKeyInfo or a bare RSAPublicKey", () => {
+    expect(parseDkimKey(RSA2048_SPKI)).toEqual({ kind: "rsa", bits: 2048 });
+    expect(parseDkimKey(RSA1024_SPKI)).toEqual({ kind: "rsa", bits: 1024 });
+    expect(parseDkimKey(RSA2048_PKCS1, "RSA")).toEqual({ kind: "rsa", bits: 2048 });
+  });
+
+  it("accepts a 32-byte Ed25519 key and an empty (revoked) one", () => {
+    expect(parseDkimKey(ED25519_RAW, "ed25519")).toEqual({ kind: "ed25519" });
+    expect(parseDkimKey("")).toEqual({ kind: "revoked" });
+  });
+
+  it.each([
+    ["non-base64 text", "!".repeat(300), "rsa"],
+    ["base64 that isn't a key", "A".repeat(392), "rsa"],
+    ["a truncated key", RSA2048_SPKI.slice(0, 200), "rsa"],
+    ["an RSA key labelled Ed25519", RSA2048_SPKI, "ed25519"],
+    ["an unknown key type", RSA2048_SPKI, "dsa"],
+  ])("rejects %s", (_name, p, k) => {
+    expect(parseDkimKey(p, k).kind).toBe("invalid");
+  });
+});
+
+describe("parseHsts (#37)", () => {
   it("reads max-age and flags", () => {
-    expect(parseHsts("max-age=31536000; includeSubDomains; preload")).toEqual({ maxAge: 31536000, includeSubDomains: true, preload: true });
-    expect(parseHsts('max-age="600"')).toEqual({ maxAge: 600, includeSubDomains: false, preload: false });
+    expect(parseHsts("max-age=31536000; includeSubDomains; preload")).toEqual({ valid: true, maxAge: 31536000, includeSubDomains: true, preload: true });
+    expect(parseHsts('MAX-AGE="600"')).toEqual({ valid: true, maxAge: 600, includeSubDomains: false, preload: false });
+    expect(parseHsts("max-age=63072000; someFutureDirective=1")).toMatchObject({ valid: true, maxAge: 63072000 });
+  });
+
+  it.each([
+    ["max-age=31536000; max-age=0", "max-age appears more than once"],
+    ["max-age=31536000; includeSubDomains; includeSubDomains", "includesubdomains appears more than once"],
+    ["includeSubDomains", "max-age is missing"],
+    ["max-age=1year", "max-age=1year isn't a number"],
+    ["max-age=31536000; preload=yes", "preload takes no value"],
+  ])("rejects %s", (header, why) => {
+    expect(parseHsts(header)).toEqual({ valid: false, why });
   });
 });
 

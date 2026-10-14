@@ -1,0 +1,6 @@
+/** Real public keys for DKIM tests, generated with openssl (private halves discarded). */
+export const RSA2048_SPKI = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyu22jdIt8ZMi1JFy0S/4BrIQO0FOE9+ExYomZAkpJFEmYy00nqq4ACG4CBiJgcx3/tU94+WdtgIPUxmDRCPjxHWjpjwl410JwQud+Hd5KPqFZ5/u9FSoykD/iquhg1G+s4OTKT8LK5dt0TpS6BzN+QJiyrJnUDLk/sVf0eY8KR6sLlx8rhGH2NjIC20c/1E0hp1+uASBlnQkA4HCEGj+4sCOgSn6vXd+J6Qw8Ub526XEutbAggsVnsyddGe+aa0ke7BXzZOjmeyUrQFStKKmJIkMl2faqM2CECXVf2E+3rlrgmP0zMDoTLOfrNvSLc+Vs0GUMdlebbGJ282f3Jr0BQIDAQAB";
+export const RSA1024_SPKI = "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCaJwc3u1RhUa0Bo/2hd7pGSN8gst+ucvxRNeRvRokouwsdzZGVclpN8fMDJkJaNuIydbyQypdRqHkAUwOkUer4VkW0rGLQ4jy8chuDSx1nNvBEXmau7U1JFv0RRcAgPWhXrL1YwfgPidHw9uppGXugusr3aky4Xel1yETAoVOXrQIDAQAB";
+/** The same kind of key as a bare RSAPublicKey (PKCS#1), which some DNS hosts publish. */
+export const RSA2048_PKCS1 = "MIIBCgKCAQEAyu22jdIt8ZMi1JFy0S/4BrIQO0FOE9+ExYomZAkpJFEmYy00nqq4ACG4CBiJgcx3/tU94+WdtgIPUxmDRCPjxHWjpjwl410JwQud+Hd5KPqFZ5/u9FSoykD/iquhg1G+s4OTKT8LK5dt0TpS6BzN+QJiyrJnUDLk/sVf0eY8KR6sLlx8rhGH2NjIC20c/1E0hp1+uASBlnQkA4HCEGj+4sCOgSn6vXd+J6Qw8Ub526XEutbAggsVnsyddGe+aa0ke7BXzZOjmeyUrQFStKKmJIkMl2faqM2CECXVf2E+3rlrgmP0zMDoTLOfrNvSLc+Vs0GUMdlebbGJ282f3Jr0BQIDAQAB";
+export const ED25519_RAW = "KBmQ+GvvjmueFXYX314BwjqZM+APY5jxV5Fpuox67Vo=";

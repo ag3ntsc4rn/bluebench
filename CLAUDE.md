@@ -41,6 +41,13 @@ packages/shared   types, indicator detection, validation (zod), used by both
 - Domain report card (M4):
   - `POST /api/domain` (`apps/api/src/domain/`) uses the same session, per-minute and daily limits as lookups (one report = one unit of the daily cap). It adds `TARGET_LIMITER`: 5 fresh reports per minute per target domain, keyed by hash, so nobody can use us to hammer a site.
   - Every report runs on a 45-subrequest budget (`Budget` in `dns.ts`; the free plan allows 50). DNS goes through one memoised `Resolver`. A check that can't get budget reports `skipped`, which isn't graded.
+  - Graders judge validity and values, not presence (issues #31–38):
+    - SPF: whole-record RFC 7208 syntax (`spfSyntaxError`); any error is a permerror, so fail.
+    - DMARC: RFC 9989. A repeated tag makes the record invalid. `t=y` is testing mode (one level below `p`). `pct` was removed, so `pct<100` warns that receivers disagree.
+    - DKIM: `p=` is decoded (SubjectPublicKeyInfo or bare RSAPublicKey), and the RSA size comes from the modulus. Ed25519 must be 32 bytes. "Not applicable" only when SPF is exactly `v=spf1 -all`; no MX proves nothing about sending.
+    - HSTS: full RFC 6797 parse; duplicate or malformed directives mean browsers ignore it, so fail.
+    - Security headers: judged by effective values (exact nosniff, DENY/SAMEORIGIN or a non-`*` frame-ancestors, a valid non-leaky Referrer-Policy, a CSP that restricts scripts).
+    - Plain HTTP: only a refused connection counts as "nothing served"; timeouts, budget and blocked hops are `skipped`.
   - Grading weights and letter cut-offs live in `packages/shared/src/domain-report.ts`. `pass` = full credit, `warn` = half, `fail` = none; `info` and `skipped` drop out of the total.
   - Site fetches use `safeFetch` with the shared resolver, the budget hook and the `Bluebench/1.0` user agent. The HTTPS probe returns at the 3-redirect cap instead of failing. Plain HTTP passes if its chain reaches `https://`.
   - Bluebench can't grade its own site. Cloudflare answers a Worker's fetch of a host in its own zone with an error page (it has X-Frame-Options and Referrer-Policy, but no HSTS and no redirect). So for the zone the request arrived on (`selfZone`, e.g. bluebench.dev and its subdomains), the HTTPS, HSTS and headers checks are `skipped`, with a note to check from outside.

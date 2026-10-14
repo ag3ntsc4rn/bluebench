@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+import { RSA2048_SPKI } from "./keys.ts";
 
 const TYPE_NUM = { A: 1, CNAME: 5, MX: 15, TXT: 16, AAAA: 28 } as const;
 type RType = keyof typeof TYPE_NUM;
@@ -84,7 +85,7 @@ export function goodDomain(domain: string): FakeNet {
       },
       "_spf.mail.test": { TXT: ["v=spf1 ip4:192.0.2.0/24 -all"] },
       [`_dmarc.${domain}`]: { TXT: [`v=DMARC1; p=reject; rua=mailto:dmarc@${domain}`] },
-      [`selector1._domainkey.${domain}`]: { TXT: [`v=DKIM1; k=rsa; p=${"A".repeat(392)}`] },
+      [`selector1._domainkey.${domain}`]: { TXT: [`v=DKIM1; k=rsa; p=${RSA2048_SPKI}`] },
     },
     sites: {
       [`https://${domain}/`]: {
