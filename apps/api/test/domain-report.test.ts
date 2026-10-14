@@ -57,7 +57,7 @@ describe("runReport", () => {
     expect(c.dnssec.status).toBe("warn");
     expect(c.https).toMatchObject({ status: "warn", summary: expect.stringContaining("doesn't redirect") });
     expect(c.hsts.status).toBe("fail");
-    expect(c.headers).toMatchObject({ status: "fail", summary: "Only 1 of 5 recommended security headers are set." });
+    expect(c.headers).toMatchObject({ status: "fail", summary: "Only 1 of 5 recommended security headers are set to protective values." });
     expect(c.cert.status).toBe("skipped"); // crt.sh down: not graded
   });
 
@@ -66,9 +66,59 @@ describe("runReport", () => {
     mockNet({ dns: { [d]: { A: ["93.184.215.14"] } }, crtsh: [] });
     const c = byId(await runReport(d, deps));
     expect(c.mx.status).toBe("info");
-    expect(c.dkim.status).toBe("info");
+    // No MX says nothing about sending (#31): without SPF saying "no mail", a missing DKIM key still warns.
+    expect(c.dkim.status).toBe("warn");
     expect(c.spf.fix).toContain("v=spf1 -all");
     expect(c.dmarc.fix).toContain("p=reject");
+  });
+
+  it("treats DKIM as not applicable only when SPF says the domain sends no mail (#31)", async () => {
+    const d = uniq();
+    mockNet({ dns: { [d]: { A: ["93.184.215.14"], TXT: ["v=spf1 -all"] } }, crtsh: [] });
+    expect(byId(await runReport(d, deps)).dkim).toMatchObject({ status: "info", summary: expect.stringContaining("v=spf1 -all") });
+  });
+
+  describe("records the reviewer showed passing wrongly", () => {
+    const mailDomain = (records: { txt?: string[]; dmarc?: string; dkim?: string }) => {
+      const d = uniq();
+      const net = goodDomain(d);
+      if (records.txt) net.dns![d]!.TXT = records.txt;
+      if (records.dmarc) net.dns![`_dmarc.${d}`] = { TXT: [records.dmarc] };
+      if (records.dkim) net.dns![`selector1._domainkey.${d}`] = { TXT: [records.dkim] };
+      mockNet(net);
+      return d;
+    };
+
+    it.each([
+      ["v=DMARC1; p=none; p=reject"],
+      ["v=DMARC1; p=reject; p=none"],
+    ])("fails a DMARC record with duplicate tags in either order: %s (#33)", async (dmarc) => {
+      const c = byId(await runReport(mailDomain({ dmarc }), deps));
+      expect(c.dmarc).toMatchObject({ status: "fail", summary: expect.stringContaining("repeats the p= tag") });
+    });
+
+    it("treats t=y as testing mode, one level below the policy (#32)", async () => {
+      const c = byId(await runReport(mailDomain({ dmarc: "v=DMARC1; p=reject; t=y" }), deps));
+      expect(c.dmarc).toMatchObject({ status: "warn", summary: "Policy p=reject is in testing mode (t=y), so receivers apply p=quarantine instead." });
+    });
+
+    it("explains that pct was removed, rather than treating it as the current rollout control (#32)", async () => {
+      const c = byId(await runReport(mailDomain({ dmarc: "v=DMARC1; p=reject; pct=0" }), deps));
+      expect(c.dmarc).toMatchObject({ status: "warn", summary: expect.stringContaining("RFC 9989") });
+    });
+
+    it.each(["v=spf1 ip4:not-an-ip -all", "v=spf1 include: -all", "v=spf1 definitely-not-a-mechanism -all"])(
+      "fails syntactically invalid SPF: %s (#34)",
+      async (spf) => {
+        const c = byId(await runReport(mailDomain({ txt: [spf] }), deps));
+        expect(c.spf).toMatchObject({ status: "fail", summary: expect.stringContaining("permerror") });
+      },
+    );
+
+    it("fails a DKIM key that isn't a key (#38)", async () => {
+      const c = byId(await runReport(mailDomain({ dkim: `v=DKIM1; k=rsa; p=${"!".repeat(300)}` }), deps));
+      expect(c.dkim).toMatchObject({ status: "fail", summary: expect.stringContaining("isn't valid base64") });
+    });
   });
 
   it("fails SPF that needs more than 10 DNS lookups", async () => {

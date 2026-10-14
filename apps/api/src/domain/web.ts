@@ -14,8 +14,11 @@ export interface WebProbe {
   hasAddress: boolean;
   /** https://domain/ chain (possibly cut off at the redirect cap), or why it failed. */
   https: { hops: SafeFetchHop[]; redirectLimitHit: boolean } | { error: string };
-  /** Where plain http://domain/ leads, or why it failed. */
-  http: PlainHttp | { error: string };
+  /**
+   * Where plain http://domain/ leads, or why it failed. `closed` is true only when the connection itself
+   * failed (nothing listening); a timeout, the budget or a blocked hop tell us nothing about port 80.
+   */
+  http: PlainHttp | { error: string; closed: boolean };
 }
 
 export interface PlainHttp {
@@ -66,7 +69,7 @@ function describe(e: unknown): string {
 /** Fetch the site's home page over https (up to 3 redirects) and see where plain http leads (up to 3 redirects). */
 export async function probeWeb(r: Resolver, budget: Budget, domain: string): Promise<WebProbe> {
   const hasAddress = (await r.addresses(domain)).length > 0;
-  if (!hasAddress) return { hasAddress, https: { error: "No address" }, http: { error: "No address" } };
+  if (!hasAddress) return { hasAddress, https: { error: "No address" }, http: { error: "No address", closed: false } };
   const opts = {
     resolve: (host: string) => r.addresses(host),
     beforeFetch: () => {
@@ -82,7 +85,8 @@ export async function probeWeb(r: Resolver, budget: Budget, domain: string): Pro
       },
       (e: unknown) => ({ error: describe(e) }),
     ),
-    followPlainHttp(`http://${domain}/`, opts).catch((e: unknown) => ({ error: describe(e) })),
+    // fetch() rejects with a TypeError when it can't connect at all; anything else leaves port 80 unknown.
+    followPlainHttp(`http://${domain}/`, opts).catch((e: unknown) => ({ error: describe(e), closed: e instanceof TypeError })),
   ]);
   return { hasAddress, https, http };
 }
@@ -127,8 +131,14 @@ export function httpsCheck(probe: WebProbe, domain: string): Check {
     fact("HTTPS response", probe.https.redirectLimitHit ? `stopped after ${probe.https.hops.length} redirects` : `${final.status} from ${final.url}`),
   ];
   if ("error" in probe.http) {
-    // Port 80 closed is fine: nothing is served unencrypted.
-    return { status: "pass", summary: "Loads over HTTPS, and nothing is served over plain HTTP.", facts };
+    // Port 80 closed is fine: nothing is served unencrypted. Anything else is no evidence either way.
+    if (probe.http.closed) return { status: "pass", summary: "Loads over HTTPS, and nothing is served over plain HTTP.", facts };
+    const why = probe.http.error === "budget" ? "request budget used up" : probe.http.error.toLowerCase();
+    return {
+      status: "skipped",
+      summary: `Loads over HTTPS, but we couldn't tell whether plain HTTP redirects to it (${why}), so this isn't graded this time.`,
+      facts,
+    };
   }
   facts.push(fact("Plain HTTP", probe.http.trail));
   if (probe.http.reachesHttps) return { status: "pass", summary: "Loads over HTTPS, and plain HTTP redirects to it.", facts };
@@ -140,13 +150,30 @@ export function httpsCheck(probe: WebProbe, domain: string): Check {
   };
 }
 
-export function parseHsts(header: string): { maxAge: number; includeSubDomains: boolean; preload: boolean } {
-  const maxAge = /max-age\s*=\s*"?(\d+)"?/i.exec(header);
-  return {
-    maxAge: maxAge ? Number(maxAge[1]) : 0,
-    includeSubDomains: /(^|;)\s*includeSubDomains\s*(;|$)/i.test(header),
-    preload: /(^|;)\s*preload\s*(;|$)/i.test(header),
-  };
+export type Hsts = { valid: true; maxAge: number; includeSubDomains: boolean; preload: boolean } | { valid: false; why: string };
+
+/**
+ * Parse a whole Strict-Transport-Security value (RFC 6797 §6.1). Browsers ignore a header that repeats a
+ * directive, lacks max-age or has a malformed one, so those come back invalid. Unknown directives are allowed.
+ */
+export function parseHsts(header: string): Hsts {
+  const seen = new Map<string, string | undefined>();
+  for (const part of header.split(";")) {
+    const directive = part.trim();
+    if (!directive) continue;
+    const eq = directive.indexOf("=");
+    const name = (eq < 0 ? directive : directive.slice(0, eq)).trim().toLowerCase();
+    if (!/^[a-z0-9!#$%&'*+.^_`|~-]+$/.test(name)) return { valid: false, why: `"${directive}" isn't a valid directive` };
+    if (seen.has(name)) return { valid: false, why: `${name} appears more than once` };
+    seen.set(name, eq < 0 ? undefined : directive.slice(eq + 1).trim());
+  }
+  const raw = seen.get("max-age");
+  const m = raw === undefined ? null : /^(?:(\d+)|"(\d+)")$/.exec(raw);
+  if (!m) return { valid: false, why: raw === undefined ? "max-age is missing" : `max-age=${raw} isn't a number` };
+  for (const flag of ["includesubdomains", "preload"]) {
+    if (seen.has(flag) && seen.get(flag) !== undefined) return { valid: false, why: `${flag} takes no value` };
+  }
+  return { valid: true, maxAge: Number(m[1] ?? m[2]), includeSubDomains: seen.has("includesubdomains"), preload: seen.has("preload") };
 }
 
 export function hstsCheck(probe: WebProbe): Check {
@@ -167,6 +194,9 @@ export function hstsCheck(probe: WebProbe): Check {
   }
   const h = parseHsts(header);
   const facts = [fact("Header", header)];
+  if (!h.valid) {
+    return { status: "fail", summary: `The HSTS header is malformed (${h.why}), so browsers ignore it.`, fix, facts };
+  }
   if (h.maxAge < ONE_YEAR) {
     const days = Math.floor(h.maxAge / 86_400);
     return {
@@ -180,17 +210,82 @@ export function hstsCheck(probe: WebProbe): Check {
   return { status: "pass", summary: `HSTS is on for a year or more${extras ? ` (${extras})` : ""}.`, facts };
 }
 
-/** `label` is the short form shown in the facts list; `name` is used in the fix text. */
-const HEADER_CHECKS: { label: string; name: string; present: (h: Headers) => boolean }[] = [
-  { label: "CSP", name: "Content-Security-Policy", present: (h) => h.has("content-security-policy") },
-  { label: "nosniff", name: "X-Content-Type-Options: nosniff", present: (h) => /nosniff/i.test(h.get("x-content-type-options") ?? "") },
+type HeaderVerdict = "ok" | "missing" | { weak: string };
+
+/** CSP directives as name → source list (lowercased). The first occurrence of a directive wins, as in browsers. */
+function cspDirectives(csp: string): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const part of csp.split(";")) {
+    const [name, ...sources] = part.trim().toLowerCase().split(/\s+/);
+    if (name && !out.has(name)) out.set(name, sources);
+  }
+  return out;
+}
+
+const REFERRER_POLICIES = new Set([
+  "no-referrer", "no-referrer-when-downgrade", "origin", "origin-when-cross-origin",
+  "same-origin", "strict-origin", "strict-origin-when-cross-origin", "unsafe-url",
+]);
+/** Policies that still send full URLs to other sites. */
+const LEAKY_REFERRER = new Set(["unsafe-url", "no-referrer-when-downgrade"]);
+
+/** `label` is the short form shown in the facts list; `name` is used in the fix text. Each judges the value, not just presence. */
+const HEADER_CHECKS: { label: string; name: string; judge: (h: Headers) => HeaderVerdict }[] = [
+  {
+    label: "CSP",
+    name: "Content-Security-Policy (restricting scripts)",
+    judge: (h) => {
+      const csp = h.get("content-security-policy");
+      if (!csp) return "missing";
+      const d = cspDirectives(csp);
+      const scripts = d.get("script-src") ?? d.get("default-src");
+      if (!scripts) return { weak: "doesn't restrict scripts (no script-src or default-src)" };
+      if (scripts.includes("*")) return { weak: "allows scripts from anywhere (*)" };
+      return "ok";
+    },
+  },
+  {
+    label: "nosniff",
+    name: "X-Content-Type-Options: nosniff",
+    judge: (h) => {
+      const v = h.get("x-content-type-options");
+      if (v === null) return "missing";
+      return v.trim().toLowerCase() === "nosniff" ? "ok" : { weak: `"${v}" isn't nosniff` };
+    },
+  },
   {
     label: "Framing",
-    name: "clickjacking protection (X-Frame-Options or CSP frame-ancestors)",
-    present: (h) => h.has("x-frame-options") || /frame-ancestors/i.test(h.get("content-security-policy") ?? ""),
+    name: "clickjacking protection (X-Frame-Options: DENY or SAMEORIGIN, or CSP frame-ancestors)",
+    judge: (h) => {
+      const ancestors = cspDirectives(h.get("content-security-policy") ?? "").get("frame-ancestors");
+      if (ancestors && ancestors.length > 0 && !ancestors.includes("*")) return "ok";
+      const xfo = h.get("x-frame-options");
+      if (xfo !== null && /^(deny|sameorigin)$/i.test(xfo.trim())) return "ok";
+      if (ancestors?.includes("*")) return { weak: "frame-ancestors * allows any site" };
+      return xfo === null ? "missing" : { weak: `X-Frame-Options "${xfo}" isn't DENY or SAMEORIGIN` };
+    },
   },
-  { label: "Referrer-Policy", name: "Referrer-Policy", present: (h) => h.has("referrer-policy") },
-  { label: "Permissions-Policy", name: "Permissions-Policy", present: (h) => h.has("permissions-policy") },
+  {
+    label: "Referrer-Policy",
+    name: "Referrer-Policy (e.g. strict-origin-when-cross-origin)",
+    judge: (h) => {
+      const v = h.get("referrer-policy");
+      if (v === null) return "missing";
+      // Browsers use the last policy they recognise in a comma-separated list.
+      const effective = v.split(",").map((t) => t.trim().toLowerCase()).filter((t) => REFERRER_POLICIES.has(t)).at(-1);
+      if (!effective) return { weak: `"${v}" isn't a valid policy` };
+      return LEAKY_REFERRER.has(effective) ? { weak: `${effective} sends full URLs to other sites` } : "ok";
+    },
+  },
+  {
+    label: "Permissions-Policy",
+    name: "Permissions-Policy",
+    judge: (h) => {
+      const v = h.get("permissions-policy");
+      if (v === null) return "missing";
+      return /^\s*[a-z-]+=/i.test(v) ? "ok" : { weak: `"${v}" isn't a valid policy` };
+    },
+  },
 ];
 
 export function headersCheck(probe: WebProbe): Check {
@@ -203,11 +298,12 @@ export function headersCheck(probe: WebProbe): Check {
     return { status: "skipped", summary: "Skipped: the home page redirects more than 3 times, and we stop there.", facts: [] };
   }
   const final = probe.https.hops.at(-1)!;
-  const missing = HEADER_CHECKS.filter((c) => !c.present(final.headers)).map((c) => c.name);
-  const have = HEADER_CHECKS.length - missing.length;
-  const facts = HEADER_CHECKS.map((c) => fact(c.label, missing.includes(c.name) ? "missing" : "present"));
-  if (missing.length === 0) return { status: "pass", summary: "All five recommended security headers are set.", facts };
-  const fix = `Add ${missing.join(", ")} at your web server or CDN.`;
-  if (have >= 3) return { status: "warn", summary: `${have} of 5 recommended security headers are set.`, fix, facts };
-  return { status: "fail", summary: `Only ${have} of 5 recommended security headers are set.`, fix, facts };
+  const verdicts = HEADER_CHECKS.map((c) => ({ c, v: c.judge(final.headers) }));
+  const bad = verdicts.filter(({ v }) => v !== "ok");
+  const have = verdicts.length - bad.length;
+  const facts = verdicts.map(({ c, v }) => fact(c.label, v === "ok" ? "set" : v === "missing" ? "missing" : `ineffective: ${v.weak}`));
+  if (bad.length === 0) return { status: "pass", summary: "All five recommended security headers are set to protective values.", facts };
+  const fix = `Set ${bad.map(({ c }) => c.name).join(", ")} at your web server or CDN.`;
+  if (have >= 3) return { status: "warn", summary: `${have} of 5 recommended security headers are set to protective values.`, fix, facts };
+  return { status: "fail", summary: `Only ${have} of 5 recommended security headers are set to protective values.`, fix, facts };
 }

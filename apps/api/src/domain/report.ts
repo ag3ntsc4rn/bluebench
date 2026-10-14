@@ -4,7 +4,7 @@ import type { Env } from "../env.ts";
 import type { Tier } from "../quota.ts";
 import { redact, restore } from "../redact.ts";
 import { certCheck } from "./cert.ts";
-import { dkimCheck, dmarcCheck, dnssecCheck, getMx, mxCheck, spfCheck } from "./email.ts";
+import { dkimCheck, dmarcCheck, dnssecCheck, getMx, mxCheck, spfCheck, spfSendsNoMail } from "./email.ts";
 import { headersCheck, hstsCheck, httpsCheck, probeWeb } from "./web.ts";
 
 /**
@@ -50,6 +50,8 @@ export async function runReport(domain: string, deps: ReportDeps): Promise<Domai
 
   const mxP = getMx(r, domain);
   const receivesMail = mxP.then((mx) => mx.hosts.length > 0).catch(() => true);
+  // Only an explicit "v=spf1 -all" means the domain sends no mail (the TXT lookup is shared with the SPF check).
+  const sendsNoMail = r.txt(domain).then(spfSendsNoMail).catch(() => false);
   const self = inZone(domain, deps.selfZone);
   const webP = self ? null : probeWeb(r, budget, domain);
   const notFromInside: Check = {
@@ -74,7 +76,7 @@ export async function runReport(domain: string, deps: ReportDeps): Promise<Domai
         ["mx", () => mxP.then(mxCheck)],
         ["spf", async () => spfCheck(r, domain, await receivesMail)],
         ["dmarc", async () => dmarcCheck(r, domain, await receivesMail)],
-        ["dkim", async () => dkimCheck(r, domain, await receivesMail)],
+        ["dkim", async () => dkimCheck(r, domain, await sendsNoMail)],
         ["dnssec", () => mxP.then((mx) => dnssecCheck(mx.answer))],
         ["https", web((w) => httpsCheck(w, domain))],
         ["hsts", web(hstsCheck)],
