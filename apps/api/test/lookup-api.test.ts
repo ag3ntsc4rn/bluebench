@@ -6,6 +6,7 @@ import * as main from "../src/index.ts";
 import { ANON_DAILY_LIMIT } from "../src/quota.ts";
 import { hmac } from "../src/session.ts";
 import { mockUpstream } from "./upstream.ts";
+import { inOneWindow, WINDOW_TIMEOUT_MS } from "./ratelimit.ts";
 
 const BASE = "https://bluebench.dev";
 let ipCounter = 1;
@@ -198,6 +199,7 @@ describe("POST /api/lookup", () => {
   });
 
   it("rate-limits a session to 10 lookups a minute", async () => {
+    await inOneWindow();
     mockUpstream();
     const c = await client();
     for (let i = 0; i < 10; i++) expect((await c.lookup("domain", "example.com")).status).toBe(200);
@@ -205,7 +207,7 @@ describe("POST /api/lookup", () => {
     expect(res.status).toBe(429);
     expect(res.headers.get("retry-after")).toBe("60");
     expect(((await res.json()) as ApiError).error).toBe("rate-limited");
-  });
+  }, WINDOW_TIMEOUT_MS);
 
   it("stops at the daily cap for an IP group, even with a fresh session", async () => {
     mockUpstream();

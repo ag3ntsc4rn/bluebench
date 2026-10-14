@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { sha256Hex, type ApiError, type CheckId, type DomainReport } from "@bluebench/shared";
 import { REPORT_BUDGET, runReport } from "../src/domain/report.ts";
 import { goodDomain, mockNet, type FakeNet } from "./net.ts";
+import { inOneWindow, WINDOW_TIMEOUT_MS } from "./ratelimit.ts";
 
 let n = 0;
 const uniq = (base = "example") => `${base}${n++}-${Date.now()}.test`;
@@ -428,6 +429,7 @@ describe("POST /api/domain", () => {
   });
 
   it("limits fresh checks of one target domain to 5 a minute", async () => {
+    await inOneWindow();
     const d = uniq("target");
     mockNet(goodDomain(d));
     const key = `report:v2:${await sha256Hex(d)}`;
@@ -447,5 +449,5 @@ describe("POST /api/domain", () => {
     }
     expect(statuses.slice(0, 5)).toEqual([200, 200, 200, 200, 200]);
     expect(statuses[5]).toBe(429);
-  });
+  }, WINDOW_TIMEOUT_MS);
 });
