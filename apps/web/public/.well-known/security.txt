@@ -1,5 +1,7 @@
-# Found a security problem in Bluebench? Thank you. Please email us; we'll reply within a few days.
+# Found a security problem in Bluebench? Thank you. Please email us or report it privately on GitHub; we'll reply within 7 days.
 Contact: mailto:security@bluebench.dev
+Contact: https://github.com/ag3ntsc4rn/bluebench/security/advisories/new
 Expires: 2027-10-01T00:00:00.000Z
 Preferred-Languages: en
+Policy: https://github.com/ag3ntsc4rn/bluebench/blob/main/SECURITY.md
 Canonical: https://bluebench.dev/.well-known/security.txt
