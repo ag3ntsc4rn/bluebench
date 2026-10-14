@@ -61,6 +61,14 @@ describe("runReport", () => {
     expect(c.cert.status).toBe("skipped"); // crt.sh down: not graded
   });
 
+  it("finds a deep subdomain's DMARC policy by walking up the tree (RFC 9989)", async () => {
+    const d = uniq("deep");
+    mockNet({ dns: { [`a.b.${d}`]: { A: ["93.184.215.14"] }, [`_dmarc.${d}`]: { TXT: ["v=DMARC1; p=reject; sp=quarantine"] } }, crtsh: [] });
+    const c = byId(await runReport(`a.b.${d}`, deps));
+    expect(c.dmarc).toMatchObject({ status: "pass", summary: "Spoofed email goes to spam (p=quarantine)." });
+    expect(c.dmarc.facts).toContainEqual({ label: "Inherited from", value: d });
+  });
+
   it("recommends lock-down records for a domain that sends no email", async () => {
     const d = uniq();
     mockNet({ dns: { [d]: { A: ["93.184.215.14"] } }, crtsh: [] });

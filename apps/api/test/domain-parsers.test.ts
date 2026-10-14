@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { covers, judgeCerts, toCertEntries } from "../src/domain/cert.ts";
-import { parseDkimKey, parseDmarc, parseSpf, parseTagList, spfSendsNoMail, spfSyntaxError } from "../src/domain/email.ts";
+import { dmarcTreeWalk, parseDkimKey, parseDmarc, parseSpf, parseTagList, spfSendsNoMail, spfSyntaxError } from "../src/domain/email.ts";
 import { parseHsts } from "../src/domain/web.ts";
 import { ED25519_RAW, RSA1024_SPKI, RSA2048_PKCS1, RSA2048_SPKI } from "./keys.ts";
 import { joinTxt } from "../src/dns.ts";
@@ -34,6 +34,22 @@ describe("parseDmarc", () => {
     expect(t.get("p")).toBe("quarantine");
     expect(t.get("pct")).toBe("50");
     expect(t.get("rua")).toBe("mailto:a@example.com");
+  });
+});
+
+describe("dmarcTreeWalk (RFC 9989 §4.10, #30)", () => {
+  it("walks from the domain up to, but not including, the TLD", () => {
+    expect(dmarcTreeWalk("a.b.c.example.com")).toEqual(["a.b.c.example.com", "b.c.example.com", "c.example.com", "example.com"]);
+    expect(dmarcTreeWalk("victim.github.io")).toEqual(["victim.github.io", "github.io"]);
+    expect(dmarcTreeWalk("example.com")).toEqual(["example.com"]);
+  });
+
+  it("jumps a very deep name to its last seven labels after the first query", () => {
+    const deep = "l1.l2.l3.l4.l5.l6.l7.l8.l9.example.com"; // 11 labels
+    const walk = dmarcTreeWalk(deep);
+    expect(walk[0]).toBe(deep);
+    expect(walk[1]).toBe("l5.l6.l7.l8.l9.example.com");
+    expect(walk.at(-1)).toBe("example.com");
   });
 });
 
