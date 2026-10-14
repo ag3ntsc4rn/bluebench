@@ -22,13 +22,47 @@ export const notConfigured = (c: Ctx) =>
 export const tooFast = (c: Ctx, message = "That's a lot of checks in a minute. Wait a moment and try again.") =>
   fail(c, 429, { error: "rate-limited", message, retryAfter: 60 });
 
+/**
+ * Bytes a JSON body may have: the paste cap in characters, at up to 4 UTF-8 bytes each, plus room for the
+ * JSON around it. Enforced while reading, so an oversized body is never buffered whole.
+ */
+export const MAX_BODY_BYTES = MAX_PASTE_LENGTH * 4 + 4096;
+
+/** Read at most `max` bytes of a body; null (and the stream cancelled) as soon as it's bigger. */
+export async function readBounded(body: ReadableStream<Uint8Array> | null, max: number): Promise<string | null> {
+  if (!body) return "";
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(total);
+  let off = 0;
+  for (const chunk of chunks) {
+    all.set(chunk, off);
+    off += chunk.byteLength;
+  }
+  return new TextDecoder().decode(all);
+}
+
 /** Read a small JSON body: must be declared JSON (forces a CORS preflight cross-site) and under the paste cap. */
 export async function readJson(c: Ctx): Promise<{ ok: true; data: unknown } | { ok: false; res: Response }> {
   if (!c.req.header("content-type")?.toLowerCase().startsWith("application/json")) {
     return { ok: false, res: fail(c, 415, { error: "invalid", message: "Expected JSON." }) };
   }
-  const text = await c.req.text();
-  if (text.length > MAX_PASTE_LENGTH) return { ok: false, res: fail(c, 413, { error: "invalid", message: "Request too large." }) };
+  const tooLarge = () => ({ ok: false as const, res: fail(c, 413, { error: "invalid", message: "Request too large." }) });
+  // A declared length over the cap is refused before reading; an undeclared or lying one is cut off while reading.
+  if (Number(c.req.header("content-length") ?? 0) > MAX_BODY_BYTES) return tooLarge();
+  const text = await readBounded(c.req.raw.body, MAX_BODY_BYTES);
+  if (text === null || text.length > MAX_PASTE_LENGTH) return tooLarge();
   try {
     return { ok: true, data: JSON.parse(text) };
   } catch {

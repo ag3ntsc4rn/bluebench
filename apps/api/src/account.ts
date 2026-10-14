@@ -21,7 +21,7 @@ import {
   type Watch,
   type WatchesResponse,
 } from "@bluebench/shared";
-import { and, asc, count, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { accountsEnabled, CODE_ATTEMPTS, currentUser, db, getAuth, MailFailed, type AccountUser } from "./auth.ts";
 import { alert, domain, lookalike, pushSubscription, user, verification, watch } from "./db/schema.ts";
 import { Budget, Resolver } from "./dns.ts";
@@ -232,15 +232,19 @@ account.post("/domains", async (c) => {
   if (!name) return fail(c, 400, { error: "invalid", message: "Enter a domain name, like example.com." });
 
   const d = db(c.env);
-  const [{ n } = { n: 0 }] = await d.select({ n: count() }).from(domain).where(eq(domain.userId, g.user.id));
-  if (n >= MAX_SAVED_DOMAINS) return fail(c, 409, { error: "invalid", message: `You can save up to ${MAX_SAVED_DOMAINS} domains. Remove one to add another.` });
-
   const row = { id: crypto.randomUUID(), userId: g.user.id, name, verifyToken: newVerifyToken(), createdAt: new Date() };
+  // The cap is checked inside the INSERT, one atomic statement, so overlapping requests can't both slip under it.
+  let inserted: number;
   try {
-    await d.insert(domain).values(row);
+    const res = await d.run(sql`
+      INSERT INTO domain (id, user_id, name, verify_token, created_at)
+      SELECT ${row.id}, ${row.userId}, ${row.name}, ${row.verifyToken}, ${row.createdAt.getTime()}
+      WHERE (SELECT count(*) FROM domain WHERE user_id = ${row.userId}) < ${MAX_SAVED_DOMAINS}`);
+    inserted = res.meta.changes;
   } catch {
     return fail(c, 409, { error: "invalid", message: `${name} is already in your list.` });
   }
+  if (inserted === 0) return fail(c, 409, { error: "invalid", message: `You can save up to ${MAX_SAVED_DOMAINS} domains. Remove one to add another.` });
   const [saved] = await d.select().from(domain).where(eq(domain.id, row.id));
   return c.json({ ok: true, domain: toSavedDomain(saved!) });
 });
@@ -308,10 +312,23 @@ account.post("/watches", async (c) => {
   // Already covered: the same watch, or the whole vendor.
   const covered = mine.find((w) => w.vendorKey === watchKey(vendor) && (w.product === null || key(w.product) === key(product)));
   if (covered) return c.json({ ok: true, watch: toWatch(covered) });
-  if (mine.length >= MAX_WATCHES) return fail(c, 409, { error: "invalid", message: `You can watch up to ${MAX_WATCHES} vendors or products. Remove one to add another.` });
 
-  const row = { id: crypto.randomUUID(), userId: g.user.id, vendor, product, vendorKey: watchKey(vendor), createdAt: new Date() };
-  await d.insert(watch).values(row);
+  const row = { id: crypto.randomUUID(), userId: g.user.id, vendor, product, vendorKey: watchKey(vendor), productKey: product === null ? "" : watchKey(product), createdAt: new Date() };
+  // One atomic statement: the cap is checked inside the INSERT, and the unique index drops an identical watch
+  // added by an overlapping request.
+  const res = await d.run(sql`
+    INSERT INTO watch (id, user_id, vendor, product, vendor_key, product_key, created_at)
+    SELECT ${row.id}, ${row.userId}, ${row.vendor}, ${row.product}, ${row.vendorKey}, ${row.productKey}, ${row.createdAt.getTime()}
+    WHERE (SELECT count(*) FROM watch WHERE user_id = ${row.userId}) < ${MAX_WATCHES}
+    ON CONFLICT (user_id, vendor_key, product_key) DO NOTHING`);
+  if (res.meta.changes === 0) {
+    const [same] = await d
+      .select()
+      .from(watch)
+      .where(and(eq(watch.userId, row.userId), eq(watch.vendorKey, row.vendorKey), eq(watch.productKey, row.productKey)));
+    if (same) return c.json({ ok: true, watch: toWatch(same) });
+    return fail(c, 409, { error: "invalid", message: `You can watch up to ${MAX_WATCHES} vendors or products. Remove one to add another.` });
+  }
   // Watching a whole vendor makes its single-product watches redundant.
   if (product === null) await d.delete(watch).where(and(eq(watch.userId, g.user.id), eq(watch.vendorKey, row.vendorKey), isNotNull(watch.product)));
   return c.json({ ok: true, watch: toWatch(row) });

@@ -146,12 +146,15 @@ async function acquire(deps: CertDeps, key: "crtsh" | "certspotter", cost = 1): 
   return permit.ok ? null : permit.reason === "daily" ? `today's ${name} budget is used up` : `${name} is busy, try again in a minute`;
 }
 
-/** crt.sh: the broad query, then once more with the lighter exact-match query if it's overloaded (502s are common). */
+/**
+ * crt.sh: the broad query, then once more with the lighter exact-match query if it's overloaded (502s are
+ * common). Each request takes its own quota permit, so retries count against crt.sh's limits too.
+ */
 async function fromCrtsh(domain: string, deps: CertDeps): Promise<Fetched> {
-  const denied = await acquire(deps, "crtsh");
-  if (denied) return { ok: false, why: denied };
   const base = `https://crt.sh/?q=${encodeURIComponent(domain)}&output=json&exclude=expired&deduplicate=Y`;
   for (const url of [base, `${base}&match=%3D`]) {
+    const denied = await acquire(deps, "crtsh");
+    if (denied) return { ok: false, why: url === base ? denied : `crt.sh is overloaded, and ${denied}` };
     if (!deps.budget.take()) return { ok: false, why: "request budget used up" };
     try {
       const res = await fetch(url, { headers: { accept: "application/json", ...UA }, signal: AbortSignal.timeout(CT_TIMEOUT_MS) });

@@ -177,9 +177,15 @@ export const watch = sqliteTable(
     product: text("product"),
     /** Lowercased vendor, for matching new KEV entries. */
     vendorKey: text("vendor_key").notNull(),
+    /** Lowercased product, "" for a whole-vendor watch: with vendorKey, makes each logical watch unique. */
+    productKey: text("product_key").notNull().default(""),
     createdAt: time("created_at").notNull(),
   },
-  (t) => [index("watch_user").on(t.userId), index("watch_vendor_key").on(t.vendorKey)],
+  (t) => [
+    index("watch_user").on(t.userId),
+    index("watch_vendor_key").on(t.vendorKey),
+    uniqueIndex("watch_user_vendor_product").on(t.userId, t.vendorKey, t.productKey),
+  ],
 );
 
 /** KEV entries the watchlist cron has already handled, so each one alerts at most once. Pruned after 120 days. */
