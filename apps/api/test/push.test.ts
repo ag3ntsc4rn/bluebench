@@ -46,6 +46,19 @@ describe("encryptPayload (RFC 8291 aes128gcm)", () => {
   });
 });
 
+describe("b64url", () => {
+  it("decodes with or without padding, and round-trips", () => {
+    const bytes = Uint8Array.from([0xfb, 0xff, 0xbf, 0x00, 0x7e]);
+    expect(b64urlEncode(bytes)).toBe("-_-_AH4");
+    expect(b64urlDecode("-_-_AH4")).toEqual(bytes);
+    expect(b64urlDecode("-_-_AH4=")).toEqual(bytes);
+  });
+
+  it("strips a long run of padding in linear time", () => {
+    expect(b64urlDecode("AQ" + "=".repeat(100_000))).toEqual(Uint8Array.from([1]));
+  });
+});
+
 describe("vapidAuthorization (RFC 8292)", () => {
   it("signs a JWT for the push service's origin that verifies with the public key", async () => {
     const keys = (await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"])) as CryptoKeyPair;

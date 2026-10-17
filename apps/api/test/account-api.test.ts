@@ -8,6 +8,7 @@ import { alert, domain, pushSubscription, session, user, verification } from "..
 import worker from "../src/index.ts";
 import { BASE, anonSession, call, codeFrom, cookieFrom, freshEmail, freshIp, mockServices, signIn } from "./account.ts";
 import { goodDomain } from "./net.ts";
+import { inOneWindow, WINDOW_TIMEOUT_MS } from "./ratelimit.ts";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -314,13 +315,14 @@ describe("account settings and deletion", () => {
 
 describe("account writes", () => {
   it("are throttled per account (D1 has a daily write budget)", async () => {
+    await inOneWindow();
     const svc = mockServices();
     const { cookie } = await signIn(svc.mails);
     const statuses: number[] = [];
     for (let i = 0; i < 31; i++) statuses.push((await call("PATCH", "/api/account", { body: { emailAlerts: i % 2 === 0 }, cookie })).status);
     expect(statuses.slice(0, 30).every((s) => s === 200)).toBe(true);
     expect(statuses[30]).toBe(429);
-  });
+  }, WINDOW_TIMEOUT_MS);
 });
 
 describe("signed-in checks", () => {
