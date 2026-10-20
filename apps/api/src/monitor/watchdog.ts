@@ -19,6 +19,11 @@ type Outcome = { ok: boolean; detail: string } | "off";
 interface Check {
   id: string;
   label: string;
+  /**
+   * Which cron run of the hour checks this (minute 45 + part). Running every check in one go took
+   * ~23 ms of CPU, over the free plan's 10 ms per run; a run that is over every time gets terminated.
+   */
+  part: number;
   run(env: Env, now: number): Promise<Outcome>;
 }
 
@@ -44,13 +49,14 @@ function answers(source: SourceId, kind: "domain" | "sha256", value: string, mus
 }
 
 export const CHECKS: readonly Check[] = [
-  { id: "urlhaus", label: "URLhaus", run: answers("urlhaus", "domain", "example.com") },
-  { id: "threatfox", label: "ThreatFox", run: answers("threatfox", "domain", "example.com") },
-  { id: "malwarebazaar", label: "MalwareBazaar", run: answers("malwarebazaar", "sha256", KNOWN_BAD_SHA256, true) },
-  { id: "safebrowsing", label: "Google Safe Browsing", run: answers("safebrowsing", "domain", "example.com") },
+  { id: "urlhaus", label: "URLhaus", part: 0, run: answers("urlhaus", "domain", "example.com") },
+  { id: "threatfox", label: "ThreatFox", part: 0, run: answers("threatfox", "domain", "example.com") },
+  { id: "malwarebazaar", label: "MalwareBazaar", part: 1, run: answers("malwarebazaar", "sha256", KNOWN_BAD_SHA256, true) },
+  { id: "safebrowsing", label: "Google Safe Browsing", part: 0, run: answers("safebrowsing", "domain", "example.com") },
   {
     id: "intel",
     label: "Exploited vulnerabilities data",
+    part: 1, // parses the ~70 KB recent KEV document
     async run(env, now) {
       const raw = await env.VERDICTS.get(KEV_KV_KEYS.recent).catch(() => null);
       if (!raw) return { ok: false, detail: "no data stored" };
@@ -66,6 +72,7 @@ export const CHECKS: readonly Check[] = [
   {
     id: "certificates",
     label: "Certificate Transparency search",
+    part: 2, // crt.sh, and up to three Cert Spotter pages when it fails
     async run(env, now) {
       const r = await probeCertificates(new URL(env.SITE_ORIGIN).hostname, { env, budget: new Budget(6), tier: "user", waitUntil: () => {}, now });
       return r.ok ? { ok: true, detail: `${r.source} answered` } : { ok: false, detail: r.why };
@@ -77,32 +84,50 @@ type Row = typeof healthCheck.$inferSelect;
 
 const hhmm = (d: Date) => `${d.toISOString().slice(0, 16).replace("T", " ")} UTC`;
 
-/** Run every check, store the results, and alert the owner on a new failure streak or a recovery. */
-export async function runWatchdog(env: Env, d: Db, now: number): Promise<Row[]> {
+export const WATCHDOG_PARTS = Math.max(...CHECKS.map((c) => c.part)) + 1;
+
+/**
+ * Run the checks of one part (all of them when `part` is omitted) and store the results. The last part
+ * also tells the owner about new failure streaks and recoveries across every check, in one alert.
+ * Until that summary, a check that recovered keeps `alerted` (and its `failingSince`) so it's announced.
+ */
+export async function runWatchdog(env: Env, d: Db, now: number, part?: number): Promise<Row[]> {
   const prev = new Map((await d.select().from(healthCheck)).map((r) => [r.id, r]));
-  const outcomes = await Promise.all(CHECKS.map(async (c) => [c, await c.run(env, now).catch((e: Error) => ({ ok: false, detail: e.message }))] as const));
+  const checks = CHECKS.filter((c) => part === undefined || c.part === part);
+  const outcomes = await Promise.all(checks.map(async (c) => [c, await c.run(env, now).catch((e: Error) => ({ ok: false, detail: e.message }))] as const));
 
   const at = new Date(now);
-  const rows: Row[] = [];
-  const news: string[] = [];
-  const fixed: string[] = [];
+  const fresh = new Map<string, Row>();
   for (const [check, out] of outcomes) {
     const before = prev.get(check.id);
     if (out === "off") {
-      rows.push({ id: check.id, ok: true, detail: "off", checkedAt: at, failingSince: null, failures: 0, alerted: false });
-      continue;
+      fresh.set(check.id, { id: check.id, ok: true, detail: "off", checkedAt: at, failingSince: null, failures: 0, alerted: false });
+    } else if (out.ok) {
+      const recovering = Boolean(before?.alerted);
+      fresh.set(check.id, { id: check.id, ok: true, detail: out.detail, checkedAt: at, failingSince: recovering ? (before!.failingSince ?? at) : null, failures: 0, alerted: recovering });
+    } else {
+      const failures = (before?.ok === false ? before.failures : 0) + 1;
+      const failingSince = before?.ok === false ? (before.failingSince ?? at) : at;
+      fresh.set(check.id, { id: check.id, ok: false, detail: out.detail, checkedAt: at, failingSince, failures, alerted: Boolean(before?.alerted) });
     }
-    if (out.ok) {
-      if (before?.alerted) fixed.push(`${check.label} is working again (it had been failing since ${hhmm(before.failingSince ?? at)}).`);
-      rows.push({ id: check.id, ok: true, detail: out.detail, checkedAt: at, failingSince: null, failures: 0, alerted: false });
-      continue;
-    }
-    const failures = (before?.ok === false ? before.failures : 0) + 1;
-    const failingSince = before?.ok === false ? (before.failingSince ?? at) : at;
-    const alertNow = failures >= FAILURES_BEFORE_ALERT && !before?.alerted;
-    if (alertNow) news.push(`${check.label} has been failing since ${hhmm(failingSince)}: ${out.detail}.`);
-    rows.push({ id: check.id, ok: false, detail: out.detail, checkedAt: at, failingSince, failures, alerted: Boolean(before?.alerted) || alertNow });
   }
+
+  const news: string[] = [];
+  const fixed: string[] = [];
+  if (part === undefined || part === WATCHDOG_PARTS - 1) {
+    for (const check of CHECKS) {
+      const row = fresh.get(check.id) ?? prev.get(check.id);
+      if (!row) continue;
+      if (!row.ok && row.failures >= FAILURES_BEFORE_ALERT && !row.alerted) {
+        news.push(`${check.label} has been failing since ${hhmm(row.failingSince ?? at)}: ${row.detail}.`);
+        fresh.set(check.id, { ...row, alerted: true });
+      } else if (row.ok && row.alerted) {
+        fixed.push(`${check.label} is working again (it had been failing since ${hhmm(row.failingSince ?? at)}).`);
+        fresh.set(check.id, { ...row, alerted: false, failingSince: null });
+      }
+    }
+  }
+  const rows = [...fresh.values()];
 
   const writes: BatchItem<"sqlite">[] = [];
   const owner = env.OWNER_EMAIL && (news.length > 0 || fixed.length > 0)
@@ -134,7 +159,7 @@ export async function serviceStatus(d: Db): Promise<StatusResponse> {
   const checks: ServiceCheck[] = CHECKS.map((c) => {
     const r = rows.get(c.id);
     const state = !r || r.detail === "off" ? "off" : r.ok ? "ok" : "failing";
-    return { id: c.id, label: c.label, state, since: r?.failingSince?.toISOString() ?? null };
+    return { id: c.id, label: c.label, state, since: state === "failing" ? (r?.failingSince?.toISOString() ?? null) : null };
   });
   const times = [...rows.values()].map((r) => r.checkedAt.getTime());
   return { ok: true, checkedAt: times.length > 0 ? new Date(Math.max(...times)).toISOString() : null, checks };

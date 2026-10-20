@@ -3,8 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { KEV_KV_KEYS, type StatusResponse } from "@bluebench/shared";
 import { eq } from "drizzle-orm";
 import { db } from "../src/auth.ts";
-import { alert, healthCheck, user } from "../src/db/schema.ts";
-import { KNOWN_BAD_SHA256, runWatchdog } from "../src/monitor/watchdog.ts";
+import { alert, healthCheck, intelState, user } from "../src/db/schema.ts";
+import { tick } from "../src/monitor/run.ts";
+import { KNOWN_BAD_SHA256, runWatchdog, WATCHDOG_PARTS } from "../src/monitor/watchdog.ts";
 import { freshEmail } from "./account.ts";
 import { mockUpstream, type UpstreamFixtures } from "./upstream.ts";
 
@@ -80,6 +81,39 @@ describe("runWatchdog", () => {
     const all = await ownerAlerts();
     expect(all).toHaveLength(2);
     expect(all.find((a) => a.title === "Bluebench: all clear again")!.body).toContain("ThreatFox is working again");
+  });
+
+  it("spreads the checks over minutes 45–47 of tick, and sends one alert from the last part", async () => {
+    mockAll({ down: ["threatfox-api.abuse.ch"] }, 502); // ThreatFox (part 0) and certificates (part 2) fail
+    const hour = async (start: number) => {
+      await d().update(alert).set({ deliveredAt: new Date(start) }); // delivery would take the run otherwise
+      for (let m = 0; m < WATCHDOG_PARTS; m++) expect(await tick(watchEnv, { now: start + m * 60_000, waitUntil: () => {} })).toBe("watchdog");
+    };
+    await d().insert(intelState).values({ key: "housekeeping_at", value: String(NOW + 9 * HOUR) }).onConflictDoUpdate({ target: intelState.key, set: { value: String(NOW + 9 * HOUR) } });
+    await d().delete(alert); // earlier tests' alerts would count here, and tick would stop to deliver them
+
+    expect(WATCHDOG_PARTS).toBe(3);
+    const part0 = await runWatchdog(watchEnv, d(), NOW, 0);
+    expect(part0.map((r) => r.id).sort()).toEqual(["safebrowsing", "threatfox", "urlhaus"]);
+    await d().delete(healthCheck);
+
+    await hour(NOW);
+    expect(await ownerAlerts()).toEqual([]);
+    await hour(NOW + HOUR);
+    const alerts = await ownerAlerts();
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]!.body).toContain("ThreatFox has been failing");
+    expect(alerts[0]!.body).toContain("Certificate Transparency search has been failing");
+
+    vi.restoreAllMocks();
+    mockAll();
+    await hour(NOW + 2 * HOUR);
+    const after = await ownerAlerts();
+    expect(after).toHaveLength(2);
+    const clear = after.find((a) => a.title === "Bluebench: all clear again")!;
+    expect(clear.body).toContain("ThreatFox is working again (it had been failing since 2026-10-13 14:45 UTC)");
+    expect(clear.body).toContain("Certificate Transparency search is working again");
+    expect((await d().select().from(healthCheck)).every((r) => r.ok && !r.alerted && r.failingSince === null)).toBe(true);
   });
 
   it("fails MalwareBazaar if the known sample stops being listed (catches broken parsing, not just outages)", async () => {

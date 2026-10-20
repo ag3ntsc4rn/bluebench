@@ -10,7 +10,7 @@ import { sendMail, takeEmailQuota } from "../mail.ts";
 import { sendPush, type PushMessage, type VapidKeys } from "../push.ts";
 import { checkKev, pruneKevSeen } from "./kev.ts";
 import { lookalikeAlert, scanLookalikes } from "./lookalike.ts";
-import { runWatchdog } from "./watchdog.ts";
+import { runWatchdog, WATCHDOG_PARTS } from "./watchdog.ts";
 import { certAlert, certAlertDays, gradeDropAlert, hasGradedChecks, mergeStatuses, verificationLostAlert, type AlertText } from "./rules.ts";
 import { hasVerifyRecord, verifyRecord } from "./verify.ts";
 
@@ -48,8 +48,8 @@ export function vapidKeys(env: Env): VapidKeys | null {
  * 3. scan the next chunk of a domain's lookalikes (a full scan of ~120 names takes about 3 runs, daily).
  * At minute 30 of each hour, step 2 and 3 give way to the watchlist check (new known exploited
  * vulnerabilities against accounts' watched products), which is cheap when nothing changed, and at
- * minute 45 to the watchdog (self-tests of every outside service; ~10 subrequests).
- * A verified domain costs about 4 runs a day, so 1,440 runs cover roughly 350 domains.
+ * minutes 45–47 to the watchdog (self-tests of every outside service, split in three to stay near 10 ms CPU).
+ * A verified domain costs about 4 runs a day, so the ~1,340 runs left cover roughly 330 domains.
  */
 export async function tick(env: Env, deps: TickDeps): Promise<TickResult> {
   if (!accountsEnabled(env)) return "off";
@@ -73,8 +73,8 @@ export async function tick(env: Env, deps: TickDeps): Promise<TickResult> {
     await checkKev(env, d, now);
     return "intel";
   }
-  if (minute === 45) {
-    await runWatchdog(env, d, now);
+  if (minute >= 45 && minute < 45 + WATCHDOG_PARTS) {
+    await runWatchdog(env, d, now, minute - 45);
     return "watchdog";
   }
 
