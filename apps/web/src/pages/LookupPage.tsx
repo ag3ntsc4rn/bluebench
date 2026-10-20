@@ -6,7 +6,7 @@ import { HeaderTool } from "../components/tools/HeaderTool";
 import { IndicatorTool } from "../components/tools/IndicatorTool";
 import { JwtTool } from "../components/tools/JwtTool";
 import { UrlDecodeTool, UrlTool } from "../components/tools/UrlTool";
-import { navigate } from "../components/AppLink";
+import { AppLink, navigate } from "../components/AppLink";
 import { looksLikeFullMessage } from "../lib/mime";
 import { handOffMessage } from "../lib/triage";
 
@@ -86,6 +86,8 @@ interface LookupPageProps {
   placeholder?: string;
   /** Show "All indicators" first when a paste has any (the IOC extractor page). */
   preferBulk?: boolean;
+  /** Point to phishing triage under the lead (the home page). */
+  triageLink?: boolean;
 }
 
 /** The "All indicators" chip: every indicator in the paste, extracted in bulk. */
@@ -94,10 +96,11 @@ const BULK = "bulk" as const;
 export function LookupPage({
   initialValue = "",
   heading = "Lookup",
-  lead = "Paste an IP, domain, URL, hash, email address, JWT, base64 or raw email headers.",
+  lead = "Paste an IP, domain, URL, hash, email address, JWT, base64, email headers or a whole email.",
   example,
-  placeholder = "e.g. 203.0.113.7, example.com, a JWT or email headers",
+  placeholder = "e.g. 203.0.113.7, example.com, a JWT or a whole email with its headers",
   preferBulk = false,
+  triageLink = false,
 }: LookupPageProps) {
   const [input, setInput] = useState(initialValue);
   const [chosen, setChosen] = useState<IndicatorKind | typeof BULK | null>(null);
@@ -135,6 +138,15 @@ export function LookupPage({
           {heading}
         </h1>
         <p className="mt-1 text-muted">{lead}</p>
+        {triageLink && (
+          <p className="mt-1 text-sm text-muted">
+            Got a suspicious email?{" "}
+            <AppLink href={TRIAGE_PATH} className="inline-flex min-h-11 items-center text-accent underline">
+              Triage the whole message
+            </AppLink>
+            , with its links and attachments, or drop in an .eml file.
+          </p>
+        )}
       </div>
       <div className="rounded-lg border border-border bg-surface p-4">
         <label htmlFor="paste" className="block text-sm font-medium">

@@ -314,9 +314,9 @@ export interface PageMeta {
 
 export const HOME: PageMeta = {
   path: "/",
-  title: "Bluebench: free IOC lookup, JWT decoder and email header analyzer",
+  title: "Bluebench: free IOC lookup, phishing email triage and domain checker",
   description:
-    "Free, open-source security toolkit for defenders. Check IPs, domains, URLs and hashes, decode JWTs and base64, analyze email headers. Nothing you paste is logged.",
+    "Free, open-source security toolkit for defenders. Check IPs, domains, URLs and hashes, triage phishing emails, grade a domain's security. Nothing you paste is logged.",
 };
 
 export interface ContentPage extends PageMeta {
