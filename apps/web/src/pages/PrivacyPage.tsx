@@ -104,6 +104,12 @@ export function PrivacyPage() {
           paste into them is never sent to us or anyone else.
         </p>
         <p>
+          <strong>Phishing triage</strong> reads the message you paste or the .eml file you choose, including its body and
+          attachments, only in your browser. They're never sent to us or anyone else, and the message is only parsed: its
+          links aren't visited, its images and other content aren't loaded, and its attachments aren't opened. As with the
+          bulk view, only the indicators you choose to check are sent, when you press Check reputation.
+        </p>
+        <p>
           The About page loads a short service-status summary from our server, and the Intel tab loads its list of exploited
           vulnerabilities. Neither request carries anything you've typed.
         </p>
