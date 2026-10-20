@@ -1,5 +1,5 @@
 import { exportVerdict, MAX_PASTE_LENGTH, type ExportVerdicts, type Extracted } from "@bluebench/shared";
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { BulkTool, type BulkResult } from "../components/tools/BulkTool";
 import { HeaderTool } from "../components/tools/HeaderTool";
 import { IndicatorTool } from "../components/tools/IndicatorTool";
@@ -229,6 +229,18 @@ function TriageResults({ msg, onOpenMessage }: { msg: ParsedMessage; onOpenMessa
   );
 }
 
+/**
+ * Is a file being dragged? `types` is a plain array in current browsers but a DOMStringList in older
+ * Safari, which can't be spread, so read it with Array.from.
+ */
+export function draggingFiles(dt: Pick<DataTransfer, "types"> | null): boolean {
+  return Boolean(dt) && Array.from(dt!.types ?? []).includes("Files");
+}
+
+export function droppedFile(dt: Pick<DataTransfer, "files"> | null): File | null {
+  return dt?.files?.[0] ?? null;
+}
+
 export function TriagePage({ heading, lead, example, placeholder }: { heading: string; lead: string; example: string; placeholder: string }) {
   // A message handed over from the Lookup paste box (memory only). Cleared once mounted.
   const [paste, setPaste] = useState(() => peekHandOff() ?? "");
@@ -278,13 +290,38 @@ export function TriagePage({ heading, lead, example, placeholder }: { heading: s
     setRun((n) => n + 1);
   };
 
-  const onDrop = (e: DragEvent<HTMLDivElement>) => {
-    setDragging(false);
-    const f = e.dataTransfer.files[0];
-    if (!f) return; // dropped text goes into the box as usual
-    e.preventDefault();
-    void loadFile(f);
-  };
+  // A file dropped anywhere on the page is read, not just on the box: otherwise a near miss makes the
+  // browser open or download the file itself. Dropped text still goes into the box as usual.
+  const loadRef = useRef(loadFile);
+  loadRef.current = loadFile;
+  useEffect(() => {
+    const over = (e: globalThis.DragEvent) => {
+      if (!draggingFiles(e.dataTransfer)) return;
+      e.preventDefault(); // accept the drop (Safari also needs this on dragenter)
+      e.dataTransfer!.dropEffect = "copy"; // a Finder drag allows copy; the default "move" can be refused
+      setDragging(true);
+    };
+    const leave = (e: globalThis.DragEvent) => {
+      if (!e.relatedTarget) setDragging(false); // left the window
+    };
+    const drop = (e: globalThis.DragEvent) => {
+      setDragging(false);
+      const f = droppedFile(e.dataTransfer);
+      if (!f) return;
+      e.preventDefault();
+      void loadRef.current(f);
+    };
+    window.addEventListener("dragenter", over);
+    window.addEventListener("dragover", over);
+    window.addEventListener("dragleave", leave);
+    window.addEventListener("drop", drop);
+    return () => {
+      window.removeEventListener("dragenter", over);
+      window.removeEventListener("dragover", over);
+      window.removeEventListener("dragleave", leave);
+      window.removeEventListener("drop", drop);
+    };
+  }, []);
 
   return (
     <section aria-labelledby="triage-heading" className="space-y-4">
@@ -297,13 +334,6 @@ export function TriagePage({ heading, lead, example, placeholder }: { heading: s
 
       <div
         data-triage-loaded={loaded ? "" : undefined}
-        onDragOver={(e) => {
-          if (![...e.dataTransfer.types].includes("Files")) return;
-          e.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={onDrop}
         className={["rounded-lg border bg-surface p-4", dragging ? "border-accent" : "border-border"].join(" ")}
       >
         {file ? (
@@ -339,7 +369,7 @@ export function TriagePage({ heading, lead, example, placeholder }: { heading: s
         <p className="mt-2 text-sm text-muted">
           {paste.length >= MAX_PASTE_LENGTH
             ? "Limit reached: only the first 64 KB is analysed. For longer messages, choose the .eml file instead."
-            : "Or drop an .eml file here (up to 10 MB). Read in your browser: nothing is sent unless you choose Check reputation."}
+            : "Or drop an .eml file anywhere on this page (up to 10 MB). Read in your browser: nothing is sent unless you choose Check reputation."}
         </p>
         {error && (
           <p role="alert" className="mt-2 flex items-start gap-2 text-sm">
