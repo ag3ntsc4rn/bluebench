@@ -46,6 +46,15 @@ describe("LookupPage", () => {
     expect(html).toMatch(/aria-pressed="false"[^>]*>All indicators/);
   });
 
+  it("offers phishing triage for a whole message, but not for headers alone", () => {
+    const headers = ["Received: from mail.example.net by mx.example.org", "From: a@example.net", "To: b@example.org", "Subject: hi"];
+    const whole = text([...headers, "", "Please log in at https://example.test/login"].join("\n"));
+    expect(whole).toMatch(/aria-pressed="true"[^>]*>Email headers/);
+    expect(whole).toContain('href="/phishing-triage"');
+    expect(whole).toContain("Open in phishing triage");
+    expect(text(headers.join("\n"))).not.toContain("Open in phishing triage");
+  });
+
   it("routes an IP to the indicator panel with its range", () => {
     const html = text("10[.]0[.]0[.]1");
     expect(html).toMatch(/aria-pressed="true"[^>]*>IPv4</);

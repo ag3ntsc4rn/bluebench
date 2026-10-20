@@ -6,6 +6,32 @@ import { HeaderTool } from "../components/tools/HeaderTool";
 import { IndicatorTool } from "../components/tools/IndicatorTool";
 import { JwtTool } from "../components/tools/JwtTool";
 import { UrlDecodeTool, UrlTool } from "../components/tools/UrlTool";
+import { navigate } from "../components/AppLink";
+import { looksLikeFullMessage } from "../lib/mime";
+import { handOffMessage } from "../lib/triage";
+
+const TRIAGE_PATH = "/phishing-triage";
+
+/** Shown above the header analysis when the paste is a whole message: triage also checks its links and attachments. */
+function TriageOffer({ message }: { message: string }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border bg-surface p-4 text-sm">
+      <span className="min-w-0 flex-1 basis-60">This is a whole email, not just its headers. Phishing triage also checks its links and attachments.</span>
+      <a
+        href={TRIAGE_PATH}
+        onClick={(e) => {
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+          e.preventDefault();
+          handOffMessage(message);
+          navigate(TRIAGE_PATH);
+        }}
+        className="inline-flex min-h-11 items-center rounded-md bg-accent px-4 font-medium text-on-accent"
+      >
+        Open in phishing triage
+      </a>
+    </div>
+  );
+}
 
 /** Short chip labels; KIND_LABELS has the long form. */
 const CHIP_LABELS: Partial<Record<IndicatorKind, string>> = {
@@ -196,6 +222,7 @@ export function LookupPage({
           </p>
         )}
 
+        {active?.kind === "email-headers" && looksLikeFullMessage(deferred) && <TriageOffer message={deferred} />}
         {active && <Tool key={`${active.kind}:${active.value}`} detection={active} onUseAsInput={replaceInput} />}
         {bulk && <BulkTool items={extracted} onUseAsInput={replaceInput} />}
       </div>
