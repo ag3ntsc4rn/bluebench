@@ -113,6 +113,9 @@ describe("tick", () => {
   it("runs the watchlist check at minute 30", async () => {
     await publish([entry("Fortinet", "FortiOS")], "v1");
     await d().insert(intelState).values({ key: "housekeeping_at", value: String(NOW) }); // cleanup isn't due
-    expect(await tick(env, { now: NOW, waitUntil: () => {} })).toMatch(/intel|delivered/);
+    // Earlier tests leave alerts pending; delivering them would take this run (and call the real
+    // email and push services, which made this test time out now and then).
+    await d().update(alert).set({ deliveredAt: new Date(NOW) });
+    expect(await tick(env, { now: NOW, waitUntil: () => {} })).toBe("intel");
   });
 });
