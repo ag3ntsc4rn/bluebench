@@ -48,6 +48,10 @@ describe("ProviderQuota", () => {
     expect(await q.acquire("threatfox", "user", DAY1)).toEqual({ ok: true });
   });
 
+  it("leaves room in KV's 1,000 writes a day for the Intel workflow", () => {
+    expect(PROVIDER_LIMITS["kv-writes"].perDay).toBeLessThanOrEqual(1000 - 50);
+  });
+
   it("stops everyone at the daily budget and resets the next UTC day", async () => {
     const q = quota();
     const { perDay } = PROVIDER_LIMITS.malwarebazaar;

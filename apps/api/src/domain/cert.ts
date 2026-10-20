@@ -1,4 +1,5 @@
 import { sha256Hex, type DomainCheck } from "@bluebench/shared";
+import { cachePut } from "../cache.ts";
 import type { Budget } from "../dns.ts";
 import type { Env } from "../env.ts";
 import type { Tier } from "../quota.ts";
@@ -131,6 +132,8 @@ export interface CertDeps {
   tier: Tier;
   waitUntil(p: Promise<unknown>): void;
   now: number;
+  /** False skips writing the cache (reads still happen); see ReportDeps.cacheWrites. */
+  cacheWrites?: boolean;
 }
 
 type Fetched = { ok: true; entries: CertEntry[] } | { ok: false; why: string };
@@ -240,8 +243,8 @@ export async function certCheck(domain: string, deps: CertDeps): Promise<CertChe
     }
   }
   if (!got.ok) return skipped(got.why);
-  if (got.entries.length > 0) {
-    deps.waitUntil(env.VERDICTS.put(key, JSON.stringify({ entries: got.entries, source }), { expirationTtl: CACHE_TTL_S }).catch(() => {}));
+  if (got.entries.length > 0 && deps.cacheWrites !== false) {
+    cachePut(deps, key, JSON.stringify({ entries: got.entries, source }), CACHE_TTL_S);
   }
   return judgeCerts(got.entries, now, source);
 }

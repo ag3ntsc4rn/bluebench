@@ -1,9 +1,10 @@
 import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { CheckId, CheckStatus } from "@bluebench/shared";
+import { sha256Hex, type CheckId, type CheckStatus } from "@bluebench/shared";
 import { eq } from "drizzle-orm";
 import { db } from "../src/auth.ts";
 import { alert, domain, pushSubscription, user } from "../src/db/schema.ts";
+import { runReport } from "../src/domain/report.ts";
 import { recheck, tick } from "../src/monitor/run.ts";
 import { freshEmail, mockServices } from "./account.ts";
 import { goodDomain, type FakeNet } from "./net.ts";
@@ -63,6 +64,20 @@ const fetchRow = async (id: string) => (await d().select().from(domain).where(eq
 const alertsFor = (userId: string) => d().select().from(alert).where(eq(alert.userId, userId));
 
 describe("recheck", () => {
+  it("reads the certificate cache but doesn't write it (the next re-check is after it expires)", async () => {
+    const name = uniq();
+    mockServices(verifiedGood(name));
+    const { row } = await seed(name);
+    await recheck(testEnv, d(), row, NOW, deps());
+    await Promise.all(later);
+    expect(await env.VERDICTS.get(`cert:v2:${await sha256Hex(name)}`)).toBeNull();
+
+    // A report someone asked for does cache it.
+    await runReport(name, { env: testEnv, tier: "user", waitUntil: deps().waitUntil, now: () => NOW });
+    await Promise.all(later);
+    expect(await env.VERDICTS.get(`cert:v2:${await sha256Hex(name)}`)).not.toBeNull();
+  });
+
   it("records a baseline on the first check, without alerting", async () => {
     const name = uniq();
     mockServices(verifiedGood(name));
@@ -166,8 +181,8 @@ describe("recheck", () => {
 describe("tick", () => {
   /** Alerts and domains from other tests may exist; run a few ticks until ours has been handled. */
   async function tickUntil(done: () => Promise<boolean>, now = NOW) {
-    // Minutes 30 and 45 belong to the watchlist check and the watchdog; step past them.
-    while ([30, 45].includes(new Date(now).getUTCMinutes())) now += 60_000;
+    // Minute 30 belongs to the watchlist check and 45–47 to the watchdog; step past them.
+    while ([30, 45, 46, 47].includes(new Date(now).getUTCMinutes())) now += 60_000;
     for (let i = 0; i < 10 && !(await done()); i++) await tick(testEnv, deps(now));
     expect(await done()).toBe(true);
   }

@@ -13,8 +13,11 @@ export interface ProviderLimits {
   perDay: number;
 }
 
-/** Everything with a ProviderQuota instance: the lookup sources, plus the CT search services for domain reports. */
-export type QuotaKey = SourceId | "crtsh" | "certspotter";
+/**
+ * Everything with a ProviderQuota instance: the lookup sources, the CT search services for domain reports,
+ * and our own KV cache writes (`cachePut`).
+ */
+export type QuotaKey = SourceId | "crtsh" | "certspotter" | "kv-writes";
 
 /**
  * Kept well inside each provider's terms: abuse.ch asks for modest volume; Safe Browsing's default
@@ -29,6 +32,9 @@ export const PROVIDER_LIMITS: Readonly<Record<QuotaKey, ProviderLimits>> = {
   safebrowsing: { perMinute: 60, perDay: 8000 },
   crtsh: { perMinute: 5, perDay: 1000 },
   certspotter: { perMinute: 1.5, burst: 4, perDay: 2000 },
+  // KV allows 1,000 writes a day; keep ~100 for the Intel workflow (≤6 a day) and manual fixes.
+  // The rate is loose: a 50-indicator bulk run writes up to 50 entries in a minute or two.
+  "kv-writes": { perMinute: 120, perDay: 900 },
 };
 
 /** Anonymous traffic may spend at most this share of a provider's daily budget. */

@@ -1,5 +1,6 @@
 import { gradeChecks, sha256Hex, type CheckId, type DomainCheck, type DomainReport } from "@bluebench/shared";
 import { Budget, BudgetExceeded, Resolver } from "../dns.ts";
+import { cachePut } from "../cache.ts";
 import type { Env } from "../env.ts";
 import type { Tier } from "../quota.ts";
 import { redact, restore } from "../redact.ts";
@@ -27,6 +28,11 @@ export interface ReportDeps {
   selfZone?: string;
   /** Subrequests this report may use; defaults to REPORT_BUDGET. */
   budget?: number;
+  /**
+   * False for monitoring re-checks: they come round every 24 h or more, after the day-long certificate
+   * cache has expired, so writing it would spend KV's daily write budget on entries nobody reads.
+   */
+  cacheWrites?: boolean;
 }
 
 const inZone = (domain: string, zone?: string) => Boolean(zone) && (domain === zone || domain.endsWith(`.${zone}`));
@@ -109,9 +115,7 @@ export async function domainReport(domain: string, deps: ReportDeps): Promise<Do
     p = runReport(domain, deps)
       .then((report) => {
         // The domain is swapped for a placeholder (and re-attached on read), so KV never holds it.
-        deps.waitUntil(
-          deps.env.VERDICTS.put(key, JSON.stringify(redact(report, domain)), { expirationTtl: REPORT_TTL_S }).catch(() => {}),
-        );
+        cachePut(deps, key, JSON.stringify(redact(report, domain)), REPORT_TTL_S);
         return report;
       })
       .finally(() => inflight.delete(domain));

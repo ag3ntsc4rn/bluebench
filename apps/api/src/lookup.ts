@@ -8,6 +8,7 @@ import {
   type SourceId,
   type SourceResult,
 } from "@bluebench/shared";
+import { cachePut } from "./cache.ts";
 import type { Env } from "./env.ts";
 import { PROVIDERS, type ProviderAnswer } from "./providers.ts";
 import type { QuotaDenial, Tier } from "./quota.ts";
@@ -101,8 +102,7 @@ async function lookupUncoalesced(kind: LookupKind, value: string, deps: LookupDe
     const merged: CacheEntry = { ...cached, ...fresh };
     for (const [s, c] of Object.entries(merged) as [SourceId, CachedSource][]) if (c.staleUntil <= now) delete merged[s];
     const ttl = Math.ceil((Math.max(...Object.values(merged).map((c) => c!.staleUntil)) - now) / 1000);
-    // KV allows 1,000 writes/day on the free tier; a failed write just means a cache miss later.
-    deps.waitUntil(env.VERDICTS.put(key, JSON.stringify(merged), { expirationTtl: Math.max(KV_MIN_TTL_S, ttl) }).catch(() => {}));
+    cachePut(deps, key, JSON.stringify(merged), Math.max(KV_MIN_TTL_S, ttl));
   }
 
   return { ok: true, kind, value, verdict: mergeVerdict(sources), sources };
