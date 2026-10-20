@@ -14,22 +14,16 @@ import {
   type LookupKind,
   USER_DAILY_LIMIT,
 } from "@bluebench/shared";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { lookupBatch } from "../../lib/api";
 import { runBulkLookup } from "../../lib/bulk";
 import { downloadText, stampedName } from "../../lib/download";
-import { defangEmail, defangHost, defangUrl } from "../../lib/summaries";
+import { defangExtracted } from "../../lib/summaries";
 import { runTurnstile } from "../../lib/turnstile";
 import { Badge, CopyButton, Panel, type Tone } from "../ui";
 import { SafeBrowsingNotice } from "./Reputation";
 
-/** Share-safe form: links and hosts stop being clickable when pasted into chat or tickets. */
-export function defangExtracted(i: Extracted): string {
-  if (i.kind === "url") return defangUrl(i.value);
-  if (i.kind === "email") return defangEmail(i.value);
-  if (i.kind === "domain" || i.kind === "ipv4") return defangHost(i.value);
-  return i.value;
-}
+export { defangExtracted };
 
 const PLURAL: Record<ExtractedKind, string> = {
   url: "URLs",
@@ -46,6 +40,7 @@ const PLURAL: Record<ExtractedKind, string> = {
 const PREVIEW = 50;
 
 type Result = BatchLookupResponse["results"][number];
+export type BulkResult = Result;
 
 const isInternalIp = (i: Extracted) => {
   const ip = i.kind === "ipv4" || i.kind === "ipv6" ? parseIp(i.value) : null;
@@ -116,8 +111,20 @@ function Group({
 type Run = { phase: "idle" } | { phase: "running"; done: number; total: number; pausedFor?: number } | { phase: "stopped"; message: string };
 
 /** Every indicator in a paste: refanged, de-duplicated, grouped, checkable in bulk and exportable. */
-export function BulkTool({ items, onUseAsInput }: { items: Extracted[]; onUseAsInput: (text: string) => void }) {
+export function BulkTool({
+  items,
+  onUseAsInput,
+  onResults,
+}: {
+  items: Extracted[];
+  onUseAsInput: (text: string) => void;
+  /** Called whenever reputation results come in (the triage tool puts them in its ticket note). */
+  onResults?: (results: ReadonlyMap<string, Result>) => void;
+}) {
   const [results, setResults] = useState<ReadonlyMap<string, Result>>(new Map());
+  useEffect(() => {
+    if (results.size > 0) onResults?.(results);
+  }, [results, onResults]);
   const [run, setRun] = useState<Run>({ phase: "idle" });
   const [listedOnly, setListedOnly] = useState(false);
   const challengeRef = useRef<HTMLDivElement>(null);

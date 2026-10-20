@@ -51,6 +51,12 @@ describe("PrivacyPage", () => {
     expect(html).toContain("searching the list happens in your browser");
   });
 
+  it("says phishing triage reads messages and attachments only in the browser", () => {
+    expect(html).toContain("Phishing triage");
+    expect(html).toContain("including its body and attachments, only in your browser");
+    expect(html).toContain("only the indicators you choose to check are sent");
+  });
+
   it("mentions the daily lookalike lookups", () => {
     expect(html).toContain("lookalike");
   });

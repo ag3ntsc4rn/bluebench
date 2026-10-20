@@ -14,7 +14,14 @@ export const SOURCE_URL = "https://github.com/ag3ntsc4rn/bluebench";
 /** Where donations go. Set to null to hide donate links (pages then say donations open soon). */
 export const DONATE_URL: string | null = "https://github.com/sponsors/ag3ntsc4rn";
 
-export type ToolSlug = "ioc-lookup" | "ioc-extractor" | "jwt-decoder" | "email-header-analyzer" | "base64-decoder" | "url-decoder";
+export type ToolSlug =
+  | "ioc-lookup"
+  | "ioc-extractor"
+  | "phishing-triage"
+  | "jwt-decoder"
+  | "email-header-analyzer"
+  | "base64-decoder"
+  | "url-decoder";
 
 export interface ToolSection {
   heading: string;
@@ -113,6 +120,82 @@ export const TOOLS: readonly ToolRoute[] = [
         heading: "Private until you choose",
         paragraphs: [
           "Extraction and exports happen in your browser. Indicators are sent to our server only when you press Check reputation, and they aren't logged.",
+        ],
+      },
+    ],
+  },
+  {
+    slug: "phishing-triage",
+    path: "/phishing-triage",
+    name: "Phishing triage",
+    title: "Phishing email triage: check a reported email in your browser | Bluebench",
+    description:
+      "Paste a reported email or drop the .eml file: sender checks, links that lie about where they go, risky attachments and every indicator. Runs in your browser.",
+    h1: "Phishing triage",
+    lead: "Someone reported an email. Paste its source or drop the .eml file to see the red flags in one place: sender, links, attachments and indicators.",
+    placeholder: "Paste the whole message source, headers first (Show original or View source)",
+    example: [
+      "Received: from mail.example.net (mail.example.net [192.0.2.10]) by mx.example.org with ESMTPS; Tue, 08 Oct 2024 10:00:05 +0000",
+      "Received: from [198.51.100.7] by mail.example.net with ESMTP; Tue, 08 Oct 2024 10:00:01 +0000",
+      "Authentication-Results: mx.example.org; spf=softfail smtp.mailfrom=example.net; dkim=none; dmarc=fail header.from=example.com",
+      "From: \"Example Payroll\" <payroll@example.com>",
+      "Reply-To: payroll-desk@example.net",
+      "To: you@example.org",
+      "Subject: Action required: confirm your salary details",
+      "Date: Tue, 08 Oct 2024 10:00:00 +0000",
+      "Message-ID: <example-1@mail.example.net>",
+      "MIME-Version: 1.0",
+      "Content-Type: multipart/mixed; boundary=\"outer\"",
+      "",
+      "--outer",
+      "Content-Type: multipart/alternative; boundary=\"inner\"",
+      "",
+      "--inner",
+      "Content-Type: text/plain; charset=utf-8",
+      "",
+      "Please confirm your salary details today: https://example-payroll.test/confirm",
+      "--inner",
+      "Content-Type: text/html; charset=utf-8",
+      "Content-Transfer-Encoding: quoted-printable",
+      "",
+      "<p>Please confirm your salary details today:</p>",
+      "<p><a href=3D\"https://example-payroll.test/confirm\">https://www.example.com/payroll</a></p>",
+      "--inner--",
+      "--outer",
+      "Content-Type: text/html; name=\"payslip.pdf.html\"",
+      "Content-Disposition: attachment; filename=\"payslip.pdf.html\"",
+      "Content-Transfer-Encoding: base64",
+      "",
+      "PCFkb2N0eXBlIGh0bWw+PHRpdGxlPkV4YW1wbGU8L3RpdGxlPjxwPlRoaXMgaXMgYSBoYXJtbGVz",
+      "cyBleGFtcGxlIGF0dGFjaG1lbnQgZm9yIEJsdWViZW5jaC4gSXQgZG9lcyBub3RoaW5nLjwvcD4K",
+      "--outer--",
+    ].join("\n"),
+    sections: [
+      {
+        heading: "What it checks",
+        paragraphs: [
+          "The sender: SPF, DKIM and DMARC results, replies going somewhere else, and the delivery path, as in the email header analyzer.",
+          "Links: every link in the text and HTML, with a red flag when the text shows one site but the link goes to another, or when it runs code (javascript:, data:) instead of opening a web page.",
+          "Attachments: name, type, size and SHA-256 hash, with a red flag for programs, scripts, shortcuts, disk images, web pages, Office files with macros, and files whose content doesn't match their name. Archives are called out too.",
+        ],
+      },
+      {
+        heading: "Share it, check it",
+        paragraphs: [
+          "Copy a ticket note with the subject, sender, authentication results, red flags, attachment hashes and every indicator, defanged so nothing is clickable. Press Check reputation to look the indicators up against URLhaus, ThreatFox, MalwareBazaar and Google Safe Browsing, and the verdicts go into the note too.",
+          "It never says a message is safe. If someone already clicked a link or opened an attachment, follow the phishing response checklist.",
+        ],
+      },
+      {
+        heading: "How to get the message",
+        paragraphs: [
+          "Gmail: More (⋮) → Download message saves an .eml file, or Show original lets you copy the source. Outlook on the web: ⋯ → View → View message source, or save the message as .eml. Apple Mail: File → Save As, format Raw Message Source. Classic Outlook's .msg files can't be read here. Files up to 10 MB; pastes up to 64 KB.",
+        ],
+      },
+      {
+        heading: "The message never leaves your browser",
+        paragraphs: [
+          "The message, its links and its attachments are read on your device. Nothing is opened, visited or loaded: the HTML is only parsed, so tracking images don't fire. Only the indicators you choose to check are sent, when you press Check reputation, and they aren't logged.",
         ],
       },
     ],
