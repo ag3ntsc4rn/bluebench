@@ -1,4 +1,4 @@
-import { CHECK_LABELS, KIND_LABELS, SOURCE_LABELS, type DomainReport, type LookupResponse, type SourceStatus } from "@bluebench/shared";
+import { CHECK_LABELS, KIND_LABELS, SOURCE_LABELS, type DomainReport, type Extracted, type LookupResponse, type SourceStatus } from "@bluebench/shared";
 import type { HeaderAnalysis } from "./email-headers";
 import type { Finding } from "./findings";
 import { formatUtc, sortFindings } from "./findings";
@@ -46,9 +46,17 @@ export const defangEmail = (address: string) => {
   return at < 0 ? defangHost(address) : `${address.slice(0, at)}@${defangHost(address.slice(at + 1))}`;
 };
 
+/** Share-safe form of an extracted indicator: links and hosts stop being clickable when pasted into chat or tickets. */
+export function defangExtracted(i: Extracted): string {
+  if (i.kind === "url") return defangUrl(i.value);
+  if (i.kind === "email") return defangEmail(i.value);
+  if (i.kind === "domain" || i.kind === "ipv4") return defangHost(i.value);
+  return i.value;
+}
+
 const SEVERITY_WORD: Record<Finding["severity"], string> = { critical: "Red flag", warning: "Warning", info: "Note" };
 
-function findingLines(findings: Finding[], empty: string): string[] {
+export function findingLines(findings: Finding[], empty: string): string[] {
   if (findings.length === 0) return [`- ${empty}`];
   return sortFindings(findings).map((f) => defangText(`- ${SEVERITY_WORD[f.severity]}: ${f.title}${f.detail ? ` (${f.detail})` : ""}`));
 }
