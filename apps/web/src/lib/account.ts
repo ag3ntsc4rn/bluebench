@@ -150,6 +150,8 @@ export async function setEmailAlerts(emailAlerts: boolean): Promise<Me | ApiErro
 export const listDomains = () => authed<DomainsResponse>("GET", "/api/domains");
 export const saveDomain = (domain: string) => authed<{ ok: true; domain: SavedDomain }>("POST", "/api/domains", { domain });
 export const verifyDomain = (id: string) => authed<{ ok: true; domain: SavedDomain }>("POST", `/api/domains/${encodeURIComponent(id)}/verify`);
+export const setBadgePublic = (id: string, badgePublic: boolean) =>
+  authed<{ ok: true; domain: SavedDomain }>("PATCH", `/api/domains/${encodeURIComponent(id)}`, { badgePublic });
 export const removeDomain = (id: string) => authed<{ ok: true }>("DELETE", `/api/domains/${encodeURIComponent(id)}`);
 export const listAlerts = () => authed<AlertsResponse>("GET", "/api/alerts");
 export const listWatches = () => authed<WatchesResponse>("GET", "/api/watches");

@@ -107,7 +107,9 @@ export default defineConfig({
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
         // Navigations to /api/ are never answered from the cache.
-        navigateFallbackDenylist: [/^\/api\//],
+        // Share links (/domain-checker/<domain>) come from the Worker, which fills in that domain's tags;
+        // answering them with the cached home page would flash the wrong page before the app catches up.
+        navigateFallbackDenylist: [/^\/api\//, /^\/domain-checker\/./],
         // The Intel data is public and the same for everyone, so the app shows the copy on the device at once
         // and refreshes it in the background. No other API response is cached: they're personal or live.
         runtimeCaching: [

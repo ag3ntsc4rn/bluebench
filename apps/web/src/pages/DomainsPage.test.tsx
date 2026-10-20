@@ -1,6 +1,8 @@
 import type { DomainReport } from "@bluebench/shared";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { App } from "../App";
+import { BadgeSettings } from "../components/MyDomains";
 import { DomainReportView, DomainsPage } from "./DomainsPage";
 
 const text = (html: string) => html.replace(/<!-- -->/g, "").replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&");
@@ -26,6 +28,11 @@ describe("DomainsPage", () => {
     expect(html).toContain('for="domain"');
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Check domain<\/button>/);
   });
+
+  it("renders a shared link's page exactly like the pre-rendered checker (it hydrates that HTML)", () => {
+    expect(renderToString(<DomainsPage initialDomain="example.com" />)).toBe(renderToString(<DomainsPage />));
+    expect(renderToString(<App initialPath="/domain-checker/example.com" />)).toBe(renderToString(<App initialPath="/domain-checker" />));
+  });
 });
 
 describe("DomainReportView", () => {
@@ -46,6 +53,10 @@ describe("DomainReportView", () => {
     expect(html).toContain("Fix: </span>Add a TXT record at _dmarc.example.com.");
   });
 
+  it("offers a Share button for the report's link", () => {
+    expect(html).toContain(">Share</span></button>");
+  });
+
   it("never uses inline style attributes (CSP forbids them)", () => {
     expect(html).not.toMatch(/\\sstyle="/);
   });
@@ -57,5 +68,36 @@ describe("DomainReportView explanations", () => {
     expect(html.match(/<summary[^>]*>What's this\?<\/summary>/g)).toHaveLength(report.checks.length);
     expect(html).toContain("It's what actually stops others sending email as you");
     expect(html).not.toMatch(/<details[^>]* open/);
+  });
+});
+
+describe("BadgeSettings", () => {
+  const saved = {
+    id: "d1",
+    domain: "example.com",
+    verifyRecord: "bluebench-verify=x",
+    verified: true,
+    grade: "B" as const,
+    score: 80,
+    lastCheckedAt: null,
+    certExpiresAt: null,
+    lookalikes: [],
+    lookalikesScannedAt: null,
+    badgePublic: false,
+    createdAt: "2026-10-01T00:00:00Z",
+  };
+
+  it("is off until the owner turns it on, with no snippet to copy", () => {
+    const html = text(renderToString(<BadgeSettings d={saved} onChange={() => {}} />));
+    expect(html).toContain("Badge off");
+    expect(html).not.toContain("/api/badge/");
+  });
+
+  it("when on, shows the badge and Markdown and HTML that link to the report", () => {
+    const html = text(renderToString(<BadgeSettings d={{ ...saved, badgePublic: true }} onChange={() => {}} />));
+    expect(html).toContain("Badge on");
+    expect(html).toContain('<img src="/api/badge/example.com.svg" alt="Bluebench grade for example.com" height="20"/>');
+    expect(html).toContain("[![Bluebench grade for example.com](https://bluebench.dev/api/badge/example.com.svg)](https://bluebench.dev/domain-checker/example.com)");
+    expect(html).toContain('&lt;a href="https://bluebench.dev/domain-checker/example.com"&gt;&lt;img src="https://bluebench.dev/api/badge/example.com.svg"'); // shown as code
   });
 });

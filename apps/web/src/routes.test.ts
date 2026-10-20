@@ -1,7 +1,7 @@
 import { detect, extractIndicators } from "@bluebench/shared";
 import { describe, expect, it } from "vitest";
 import { decodeJwt } from "./lib/jwt";
-import { ABOUT, ALERTS, DOMAINS, HOME, INTEL, pageForPath, PRIVACY, RESPOND, SETTINGS, SIGNIN, TOOLS } from "./routes";
+import { ABOUT, ALERTS, DOMAINS, HOME, INTEL, metaFor, pageForPath, pathOf, PRIVACY, RESPOND, SETTINGS, SIGNIN, TOOLS } from "./routes";
 import { RUNBOOKS } from "./runbooks";
 
 const EXPECTED_KIND = {
@@ -55,5 +55,15 @@ describe("routes", () => {
     expect(pageForPath("/respond/nope")).toEqual({ kind: "notfound" });
     expect(pageForPath("/settings/")).toEqual({ kind: "settings" });
     expect(pageForPath("/wp-admin")).toEqual({ kind: "notfound" });
+  });
+
+  it("maps a shareable report link to the domain checker for that domain", () => {
+    expect(pageForPath("/domain-checker/Example.COM/")).toEqual({ kind: "domains", domain: "example.com" });
+    expect(pageForPath("/domain-checker/203.0.113.7")).toEqual({ kind: "notfound" });
+    expect(pageForPath("/domain-checker/a/b")).toEqual({ kind: "notfound" });
+    expect(pageForPath("/domain-checker/%E0%A4%A")).toEqual({ kind: "notfound" });
+    const page = { kind: "domains", domain: "example.com" } as const;
+    expect(pathOf(page)).toBe("/domain-checker/example.com");
+    expect(metaFor(page).title).toBe("example.com security report card | Bluebench");
   });
 });

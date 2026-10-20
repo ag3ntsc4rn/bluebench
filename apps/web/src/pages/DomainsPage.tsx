@@ -1,8 +1,9 @@
 import { CHECK_LABELS, type ApiError, type CheckStatus, type DomainCheck, type DomainReport, type Grade } from "@bluebench/shared";
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { MyDomains } from "../components/MyDomains";
 import { Badge, CopyButton, Facts, WhatsThis, type Tone } from "../components/ui";
 import { checkDomain } from "../lib/api";
+import { reportPath, SITE_URL } from "../routes";
 import { CHECK_EXPLAINERS } from "../lib/explainers";
 import { domainFromInput } from "../lib/domain-input";
 import { summarizeDomain } from "../lib/summaries";
@@ -54,6 +55,27 @@ function CheckRow({ check }: { check: DomainCheck }) {
 
 const ORDER: Record<CheckStatus, number> = { fail: 0, warn: 1, pass: 2, info: 3, skipped: 4 };
 
+/** The share sheet where there is one (phones), otherwise copy the report's link. */
+function ShareButton({ domain, grade }: { domain: string; grade: Grade }) {
+  const [copied, setCopied] = useState(false);
+  const url = `${SITE_URL}${reportPath(domain)}`;
+  const share = async () => {
+    if (navigator.share) {
+      await navigator.share({ title: `${domain}: grade ${grade}`, url }).catch(() => {}); // dismissed
+      return;
+    }
+    await navigator.clipboard?.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+  return (
+    <button type="button" onClick={() => void share()} className="min-h-11 shrink-0 rounded-md border border-border px-3 text-sm text-muted hover:text-fg">
+      <span aria-live="polite">{copied ? "Link copied" : "Share"}</span>
+    </button>
+  );
+}
+
 export function DomainReportView({ report }: { report: DomainReport }) {
   const grade = GRADE[report.grade];
   const checks = [...report.checks].sort((a, b) => ORDER[a.status] - ORDER[b.status]);
@@ -77,6 +99,9 @@ export function DomainReportView({ report }: { report: DomainReport }) {
             {report.cached ? " (cached; results refresh hourly)" : ""}
           </p>
         </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <ShareButton domain={report.domain} grade={report.grade} />
         <CopyButton value={summarizeDomain(report)} label="Copy result" />
       </div>
       <ul className="space-y-3">
@@ -93,11 +118,17 @@ type State = { phase: "idle" } | { phase: "loading" } | { phase: "done"; report:
 interface DomainsPageProps {
   heading?: string;
   lead?: string;
+  /** From a shareable link (/domain-checker/<domain>): filled in and checked when the page opens. */
+  initialDomain?: string;
+  /** A report came back for this domain. */
+  onReport?: (domain: string) => void;
 }
 
 export function DomainsPage({
   heading = "Domains",
   lead = "Get a report card for a domain's email and web security: SPF, DMARC, DKIM, DNSSEC, HTTPS, HSTS, headers and certificate expiry.",
+  initialDomain,
+  onReport,
 }: DomainsPageProps) {
   const [input, setInput] = useState("");
   const [state, setState] = useState<State>({ phase: "idle" });
@@ -109,7 +140,18 @@ export function DomainsPage({
     setState({ phase: "loading" });
     const res = await checkDomain(target, (siteKey) => runTurnstile(challengeRef.current!, siteKey));
     setState(res.ok ? { phase: "done", report: res } : { phase: "error", error: res });
+    if (res.ok) onReport?.(res.domain);
   };
+
+  // A shared link opens straight on its report. In an effect, so the first render matches the
+  // pre-rendered page; the ref stops StrictMode's second run from checking twice.
+  const opened = useRef(false);
+  useEffect(() => {
+    if (!initialDomain || opened.current) return;
+    opened.current = true;
+    setInput(initialDomain);
+    void check(initialDomain);
+  }, []);
 
   const run = (e: FormEvent) => {
     e.preventDefault();

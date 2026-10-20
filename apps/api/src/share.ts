@@ -41,8 +41,8 @@ export async function sharePage(req: Request, env: Env): Promise<Response> {
   const name = sharedDomain(url.pathname);
   // The assets binding answers unknown paths with the 404 page and a real 404.
   if (!name) return env.ASSETS.fetch(new Request(url, { method: req.method }));
-  const canonical = `${url.origin}${SHARE_PREFIX}${name}`;
-  if (url.pathname !== `${SHARE_PREFIX}${name}`) return Response.redirect(canonical, 301);
+  if (url.pathname !== `${SHARE_PREFIX}${name}`) return Response.redirect(`${url.origin}${SHARE_PREFIX}${name}`, 301);
+  const canonical = `${env.SITE_ORIGIN}${SHARE_PREFIX}${name}`;
 
   const page = await env.ASSETS.fetch(new Request(new URL("/domain-checker", url.origin)));
   if (!page.ok) return page;
