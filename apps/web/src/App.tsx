@@ -94,7 +94,7 @@ export function App({ initialTab = "lookup", initialPath }: { initialTab?: TabId
   else if (page.kind === "signin") content = <SignInPage onDone={() => go({ kind: "domains" })} />;
   else if (page.kind === "tool") content = <ToolPage key={page.tool.slug} tool={page.tool} />;
   else if (page.kind === "notfound") content = <NotFoundPage />;
-  else if (tab.id === "lookup") content = <LookupPage />;
+  else if (tab.id === "lookup") content = <LookupPage triageLink />;
   else if (tab.id === "domains") content = <DomainsPage />;
   else if (tab.id === "alerts") content = <AlertsPage />;
   else if (tab.id === "respond") content = <RespondPage />;

@@ -14,6 +14,13 @@ const text = (value: string) =>
     .replace(/&amp;/g, "&");
 
 describe("LookupPage", () => {
+  it("points to phishing triage on the home page only", () => {
+    const home = renderToString(<LookupPage triageLink />);
+    expect(home).toContain("a whole email");
+    expect(home).toMatch(/<a [^>]*href="\/phishing-triage"[^>]*>Triage the whole message<\/a>/);
+    expect(renderToString(<LookupPage heading="IOC lookup" lead="Check an indicator." />)).not.toContain("/phishing-triage");
+  });
+
   it("shows no tool for empty input", () => {
     const html = render("");
     expect(html).not.toContain("Detected:");
