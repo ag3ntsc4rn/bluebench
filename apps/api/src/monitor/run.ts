@@ -150,6 +150,7 @@ export async function recheck(env: Env, d: Db, row: DomainRow, now: number, deps
     now: () => now,
     selfZone: orgDomain(new URL(env.SITE_ORIGIN).hostname),
     budget: REPORT_BUDGET,
+    cacheWrites: false,
   });
 
   const alerts: ReturnType<typeof newAlert>[] = [];

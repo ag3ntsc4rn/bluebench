@@ -1,9 +1,10 @@
 import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { CheckId, CheckStatus } from "@bluebench/shared";
+import { sha256Hex, type CheckId, type CheckStatus } from "@bluebench/shared";
 import { eq } from "drizzle-orm";
 import { db } from "../src/auth.ts";
 import { alert, domain, pushSubscription, user } from "../src/db/schema.ts";
+import { runReport } from "../src/domain/report.ts";
 import { recheck, tick } from "../src/monitor/run.ts";
 import { freshEmail, mockServices } from "./account.ts";
 import { goodDomain, type FakeNet } from "./net.ts";
@@ -63,6 +64,20 @@ const fetchRow = async (id: string) => (await d().select().from(domain).where(eq
 const alertsFor = (userId: string) => d().select().from(alert).where(eq(alert.userId, userId));
 
 describe("recheck", () => {
+  it("reads the certificate cache but doesn't write it (the next re-check is after it expires)", async () => {
+    const name = uniq();
+    mockServices(verifiedGood(name));
+    const { row } = await seed(name);
+    await recheck(testEnv, d(), row, NOW, deps());
+    await Promise.all(later);
+    expect(await env.VERDICTS.get(`cert:v2:${await sha256Hex(name)}`)).toBeNull();
+
+    // A report someone asked for does cache it.
+    await runReport(name, { env: testEnv, tier: "user", waitUntil: deps().waitUntil, now: () => NOW });
+    await Promise.all(later);
+    expect(await env.VERDICTS.get(`cert:v2:${await sha256Hex(name)}`)).not.toBeNull();
+  });
+
   it("records a baseline on the first check, without alerting", async () => {
     const name = uniq();
     mockServices(verifiedGood(name));

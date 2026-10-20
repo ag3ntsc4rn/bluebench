@@ -91,7 +91,7 @@ packages/shared   types, indicator detection, validation (zod), used by both
 
 Stay on Cloudflare's free tier. Free-tier limits that shape the design:
 - Workers: 100k requests/day, 10 ms CPU per request
-- KV: **1,000 writes/day** — KV is for cached verdicts, domain reports and the Intel data (≤6 writes/day), never counters
+- KV: **1,000 writes/day** — KV is for cached verdicts, domain reports and the Intel data (≤6 writes/day), never counters. Every cache write goes through `cachePut` (`apps/api/src/cache.ts`), which takes a permit from the `kv-writes` `ProviderQuota` (900/day, anonymous traffic 60 %), so the Intel workflow always has room; without a permit the entry just isn't cached. Monitoring re-checks read the cache but don't write it (`cacheWrites: false`): they come round after the 24 h certificate cache has expired.
 - D1: 100k rows written/day
 - Resend free: 100 emails/day — prefer push; email for magic links and digests
 

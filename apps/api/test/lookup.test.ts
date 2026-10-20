@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { LookupKind } from "@bluebench/shared";
+import { cacheKey, type LookupKind } from "@bluebench/shared";
 import type { Env } from "../src/env.ts";
 import { lookup } from "../src/lookup.ts";
 import type { QuotaDenial } from "../src/quota.ts";
@@ -78,6 +78,21 @@ describe("lookup", () => {
     vi.restoreAllMocks();
     mockUpstream({ down: ["urlhaus-api.abuse.ch"] });
     expect(source(await run("domain", d, { now: t0 + 7 * HOUR }), "urlhaus")).toMatchObject({ status: "listed", stale: true });
+  });
+
+  it("answers but doesn't cache once today's KV write budget is spent", async () => {
+    const d = domain();
+    mockUpstream({ urlhausHost: { [d]: { url_count: 1, urls: [], blacklists: {} } } });
+    const writesSpent = {
+      idFromName: (name: string) => name,
+      get: (name: string) => ({ acquire: async () => (name === "kv-writes" ? { ok: false, reason: "daily" } : { ok: true }) }),
+    } as unknown as Env["PROVIDER_QUOTA"];
+    const res = await run("domain", d, { env: { PROVIDER_QUOTA: writesSpent } });
+    expect(source(res, "urlhaus")).toMatchObject({ status: "listed" });
+    expect(await env.VERDICTS.get(await cacheKey("domain", d))).toBeNull();
+
+    await run("domain", d); // with budget, the same lookup is cached
+    expect(await env.VERDICTS.get(await cacheKey("domain", d))).not.toBeNull();
   });
 
   it("coalesces concurrent lookups of the same indicator", async () => {
