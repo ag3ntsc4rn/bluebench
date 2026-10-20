@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import {
   AccountSettingsSchema,
   canonicalDomain,
+  DomainSettingsSchema,
   MAX_PUSH_SUBSCRIPTIONS,
   MAX_SAVED_DOMAINS,
   MAX_WATCHES,
@@ -100,6 +101,7 @@ function toSavedDomain(row: typeof domain.$inferSelect, hits: (typeof lookalike.
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((h) => ({ domain: h.name, web: h.web, mail: h.mail, firstSeenAt: h.firstSeenAt.toISOString() })),
     lookalikesScannedAt: iso(row.lookalikeScannedAt),
+    badgePublic: row.badgePublic,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -273,6 +275,25 @@ account.post("/domains/:id/verify", async (c) => {
   // lastCheckedAt cleared so the first daily check runs within a minute or two.
   await d.update(domain).set({ verifiedAt: new Date(), lastCheckedAt: null }).where(eq(domain.id, row.id));
   return c.json({ ok: true, domain: toSavedDomain({ ...row, verifiedAt: new Date(), lastCheckedAt: null }) });
+});
+
+/** Per-domain settings: publishing the grade badge needs a verified domain (proof the user owns it). */
+account.patch("/domains/:id", async (c) => {
+  const g = await requireWriter(c);
+  if (!g.ok) return g.res;
+  const body = await readJson(c);
+  if (!body.ok) return body.res;
+  const parsed = DomainSettingsSchema.safeParse(body.data);
+  if (!parsed.success) return fail(c, 400, { error: "invalid", message: "Invalid settings." });
+  const d = db(c.env);
+  const [row] = await d.select().from(domain).where(and(eq(domain.id, c.req.param("id")), eq(domain.userId, g.user.id)));
+  if (!row) return fail(c, 404, { error: "invalid", message: "That domain isn't in your list." });
+  if (parsed.data.badgePublic && !row.verifiedAt) {
+    return fail(c, 400, { error: "invalid", message: `Verify ${row.name} first: only its owner can publish its grade.` });
+  }
+  await d.update(domain).set({ badgePublic: parsed.data.badgePublic }).where(eq(domain.id, row.id));
+  const hits = await d.select().from(lookalike).where(eq(lookalike.domainId, row.id));
+  return c.json({ ok: true, domain: toSavedDomain({ ...row, badgePublic: parsed.data.badgePublic }, hits) });
 });
 
 account.delete("/domains/:id", async (c) => {

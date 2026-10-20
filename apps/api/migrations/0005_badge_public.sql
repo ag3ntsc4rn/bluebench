@@ -1,0 +1,1 @@
+ALTER TABLE `domain` ADD `badge_public` integer DEFAULT false NOT NULL;

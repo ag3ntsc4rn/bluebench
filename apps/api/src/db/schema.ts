@@ -104,6 +104,8 @@ export const domain = sqliteTable(
     lookalikeScannedAt: time("lookalike_scanned_at"),
     /** Last lookalike chunk run (or attempt), so domains take turns. */
     lookalikeCheckedAt: time("lookalike_checked_at"),
+    /** The owner publishes this domain's grade as a badge at /api/badge/<name>.svg (needs verification too). */
+    badgePublic: integer("badge_public", { mode: "boolean" }).notNull().default(false),
     createdAt: time("created_at").notNull(),
   },
   (t) => [uniqueIndex("domain_user_name").on(t.userId, t.name), index("domain_due").on(t.verifiedAt, t.lastCheckedAt)],
