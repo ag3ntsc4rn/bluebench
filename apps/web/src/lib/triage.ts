@@ -237,7 +237,7 @@ export function classifyAttachment(a: Pick<MimeAttachment, "filename" | "content
   if (risky && parts.length >= 3 && DECOY_EXTS.has(parts.at(-2)!)) {
     findings.push({ severity: "critical", title: "File name hides its real type", detail: `It looks like a .${parts.at(-2)} but is really a .${ext}.` });
   }
-  if (/[‪-‮⁦-⁩]/.test(a.filename)) {
+  if (/[\u202A-\u202E\u2066-\u2069]/.test(a.filename)) {
     findings.push({ severity: "critical", title: "File name contains hidden direction characters", detail: "They reverse part of the name so the real extension is disguised." });
   }
 

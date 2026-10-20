@@ -109,8 +109,8 @@ function TriageResults({ msg, onOpenMessage }: { msg: ParsedMessage; onOpenMessa
         )}
         <p className="text-sm text-muted">
           {links.length} link{links.length === 1 ? "" : "s"}, {attachments.length} attachment{attachments.length === 1 ? "" : "s"},{" "}
-          {indicators.length} indicator{indicators.length === 1 ? "" : "s"}. Nothing was opened or visited, and nothing has left
-          your browser.
+          {indicators.length} indicator{indicators.length === 1 ? "" : "s"}. Nothing was opened or visited, and nothing leaves your
+          browser unless you press Check reputation.
         </p>
         {msg.warnings.length > 0 && (
           <ul className="space-y-2">
