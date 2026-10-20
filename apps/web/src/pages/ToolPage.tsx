@@ -1,5 +1,6 @@
 import type { ToolRoute, ToolSection } from "../routes";
 import { LookupPage } from "./LookupPage";
+import { TriagePage } from "./TriagePage";
 
 /** The short explainer under a tool: what it does, how, and why it's private. Real text for search engines too. */
 export function Explainer({ sections }: { sections: readonly ToolSection[] }) {
@@ -23,7 +24,11 @@ export function Explainer({ sections }: { sections: readonly ToolSection[] }) {
 export function ToolPage({ tool }: { tool: ToolRoute }) {
   return (
     <div className="space-y-8">
-      <LookupPage heading={tool.h1} lead={tool.lead} example={tool.example} placeholder={tool.placeholder} preferBulk={tool.preferBulk} />
+      {tool.slug === "phishing-triage" ? (
+        <TriagePage heading={tool.h1} lead={tool.lead} example={tool.example} placeholder={tool.placeholder} />
+      ) : (
+        <LookupPage heading={tool.h1} lead={tool.lead} example={tool.example} placeholder={tool.placeholder} preferBulk={tool.preferBulk} />
+      )}
       <Explainer sections={tool.sections} />
     </div>
   );

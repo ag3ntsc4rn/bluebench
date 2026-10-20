@@ -1,12 +1,16 @@
 import { detect, extractIndicators } from "@bluebench/shared";
 import { describe, expect, it } from "vitest";
 import { decodeJwt } from "./lib/jwt";
+import { parseMime } from "./lib/mime";
+import { collectLinks, readHtml, reportAttachment } from "./lib/triage";
 import { ABOUT, ALERTS, DOMAINS, HOME, INTEL, metaFor, pageForPath, pathOf, PRIVACY, RESPOND, SETTINGS, SIGNIN, TOOLS } from "./routes";
 import { RUNBOOKS } from "./runbooks";
 
 const EXPECTED_KIND = {
   "ioc-lookup": "url",
   "ioc-extractor": "bulk",
+  // A whole message: the paste box sees its headers (and offers triage).
+  "phishing-triage": "email-headers",
   "jwt-decoder": "jwt",
   "email-header-analyzer": "email-headers",
   "base64-decoder": "base64",
@@ -20,6 +24,23 @@ describe("routes", () => {
       expect(new Set(extractIndicators(tool.example).map((e) => e.kind))).toEqual(new Set(["url", "domain", "ipv4", "email", "sha256"]));
       expect(extractIndicators(tool.example).some((e) => e.value.includes("invoice"))).toBe(false);
     } else expect(detect(tool.example)[0]?.kind).toBe(EXPECTED_KIND[slug]);
+  });
+
+  it("the phishing triage example exercises the whole flow, using only reserved names", () => {
+    const tool = TOOLS.find((t) => t.slug === "phishing-triage")!;
+    const msg = parseMime(tool.example);
+    expect(msg.warnings).toEqual([]);
+    expect(msg.text).toHaveLength(1);
+    expect(msg.html).toHaveLength(1);
+    const links = collectLinks(msg, msg.html.map(readHtml));
+    expect(links.some((l) => l.findings.some((f) => f.title === "Link text shows a different site"))).toBe(true);
+    const [attachment] = msg.attachments.map(reportAttachment);
+    expect(attachment?.filename).toBe("payslip.pdf.html");
+    expect(attachment?.findings.map((f) => f.title)).toContain("File name hides its real type");
+    for (const host of tool.example.match(/[a-z0-9.-]+\.[a-z]{2,}(?=[/>"\s;]|$)/gim) ?? []) {
+      if (/\.(html|pdf)$/i.test(host)) continue;
+      expect(host, host).toMatch(/(^|\.)example\.(com|net|org)$|\.test$/i);
+    }
   });
 
   it("every tool has its own placeholder", () => {
@@ -45,6 +66,7 @@ describe("routes", () => {
     expect(pageForPath("/")).toEqual({ kind: "home" });
     expect(pageForPath("/privacy/")).toEqual({ kind: "privacy" });
     expect(pageForPath("/jwt-decoder")).toMatchObject({ kind: "tool", tool: { slug: "jwt-decoder" } });
+    expect(pageForPath("/phishing-triage")).toMatchObject({ kind: "tool", tool: { slug: "phishing-triage" } });
     expect(pageForPath("/domain-checker")).toEqual({ kind: "domains" });
     expect(pageForPath("/alerts")).toEqual({ kind: "alerts" });
     expect(pageForPath("/signin")).toEqual({ kind: "signin" });

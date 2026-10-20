@@ -47,6 +47,7 @@ export interface Runbook {
 
 const IOC = { path: "/ioc-lookup", label: "IOC lookup" };
 const HEADERS = { path: "/email-header-analyzer", label: "email header analyzer" };
+const TRIAGE = { path: "/phishing-triage", label: "phishing triage" };
 const URLS = { path: "/url-decoder", label: "URL decoder" };
 const DOMAINS = { path: "/domain-checker", label: "domain checker" };
 
@@ -122,8 +123,8 @@ export const RUNBOOKS: readonly Runbook[] = [
             tool: URLS,
           },
           {
-            do: "Analyse the email's full headers: who really sent it, and whether SPF, DKIM and DMARC passed.",
-            tool: HEADERS,
+            do: "Triage the whole email (its .eml file or source): who really sent it, whether SPF, DKIM and DMARC passed, where its links go and what its attachments are.",
+            tool: TRIAGE,
           },
           {
             do: "Review the account's recent sign-ins for unfamiliar locations, devices or times, and check their IP addresses.",

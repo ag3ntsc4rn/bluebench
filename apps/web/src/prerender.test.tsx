@@ -40,6 +40,15 @@ describe("prerender", () => {
     expect(byFile["index.html"]).toContain('href="/email-header-analyzer"');
   });
 
+  it("pre-renders the phishing triage page with its file picker, and lists it in the sitemap and footer", () => {
+    const html = byFile["phishing-triage.html"]!;
+    expect(html).toMatch(/<div id="root">.*<h1[^>]*>Phishing triage<\/h1>/s);
+    expect(html).toContain('type="file"');
+    expect(html).toContain("Choose .eml file");
+    expect(byFile["index.html"]).toContain('href="/phishing-triage"');
+    expect(sitemap(pages)).toContain("<loc>https://bluebench.dev/phishing-triage</loc>");
+  });
+
   it("marks the 404 page noindex and leaves it out of the sitemap", () => {
     expect(byFile["404.html"]).toContain('<meta name="robots" content="noindex" />');
     expect(byFile["404.html"]).not.toContain('rel="canonical"');
