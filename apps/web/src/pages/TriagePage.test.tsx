@@ -2,7 +2,7 @@ import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
 import { clearHandOff, handOffMessage } from "../lib/triage";
 import { TOOLS } from "../routes";
-import { TriagePage } from "./TriagePage";
+import { draggingFiles, droppedFile, TriagePage } from "./TriagePage";
 
 const tool = TOOLS.find((t) => t.slug === "phishing-triage")!;
 const render = () =>
@@ -36,5 +36,29 @@ describe("TriagePage", () => {
     // The email's own HTML is never put into the page: its link exists only as text.
     expect(html).not.toContain('<a href="https://example-payroll.test');
     expect(html).not.toMatch(/\sstyle="/);
+  });
+});
+
+describe("drag and drop", () => {
+  it("recognises a file drag whether types is an array or Safari's older DOMStringList", () => {
+    // Array-like but not iterable, like Safari's DOMStringList.
+    const list = (items: string[]) => Object.assign({ length: items.length, item: (i: number) => items[i] ?? null }, Object.fromEntries(items.entries())) as unknown as DOMStringList;
+    expect(draggingFiles({ types: ["Files"] })).toBe(true);
+    const safari = list(["public.file-url", "Files"]);
+    expect(() => [...(safari as unknown as string[])]).toThrow(); // why the code can't spread it
+    expect(draggingFiles({ types: safari as unknown as readonly string[] })).toBe(true);
+    expect(draggingFiles({ types: ["text/plain"] })).toBe(false); // dropped text goes into the box
+    expect(draggingFiles(null)).toBe(false);
+  });
+
+  it("takes the first dropped file, if any", () => {
+    const f = new File(["x"], "message.eml");
+    expect(droppedFile({ files: [f] as unknown as FileList })).toBe(f);
+    expect(droppedFile({ files: [] as unknown as FileList })).toBeNull();
+    expect(droppedFile(null)).toBeNull();
+  });
+
+  it("says files can be dropped anywhere on the page", () => {
+    expect(render()).toContain("Or drop an .eml file anywhere on this page");
   });
 });
