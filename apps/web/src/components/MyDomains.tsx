@@ -1,9 +1,10 @@
 import { MAX_SAVED_DOMAINS, type ApiError, type Grade, type SavedDomain } from "@bluebench/shared";
 import { useEffect, useState, type FormEvent } from "react";
-import { listDomains, removeDomain, saveDomain, useAccount, verifyDomain } from "../lib/account";
+import { listDomains, removeDomain, saveDomain, setBadgePublic, useAccount, verifyDomain } from "../lib/account";
 import { domainFromInput } from "../lib/domain-input";
 import { SignInForm } from "./SignInForm";
-import { Badge, CopyButton, type Tone } from "./ui";
+import { reportPath, SITE_URL } from "../routes";
+import { Badge, CodeBlock, CopyButton, type Tone } from "./ui";
 
 const GRADE_TONE: Record<Grade, Tone> = { A: "ok", B: "ok", C: "warn", D: "warn", F: "critical" };
 
@@ -40,6 +41,57 @@ function Lookalikes({ d }: { d: SavedDomain }) {
         <p className="text-sm text-muted">
           Some may be yours or harmless. Ones you don't recognise could be used for phishing: warn your users, and report abuse to the registrar or host.
         </p>
+      </div>
+    </details>
+  );
+}
+
+/** Publish the daily grade as an image for a README or site footer. Only offered once verified. */
+export function BadgeSettings({ d, onChange }: { d: SavedDomain; onChange: (d: SavedDomain) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const image = `${SITE_URL}/api/badge/${d.domain}.svg`;
+  const link = `${SITE_URL}${reportPath(d.domain)}`;
+  const alt = `Bluebench grade for ${d.domain}`;
+
+  const toggle = async (on: boolean) => {
+    setBusy(true);
+    const res = await setBadgePublic(d.id, on);
+    setBusy(false);
+    if (res.ok) {
+      onChange(res.domain);
+      setError(null);
+    } else setError(res.message);
+  };
+
+  return (
+    <details className="rounded-md border border-border">
+      <summary className="flex min-h-11 cursor-pointer items-center gap-2 px-3 text-sm">
+        <Badge tone={d.badgePublic ? "ok" : "neutral"}>{d.badgePublic ? "Badge on" : "Badge off"}</Badge>
+        <span>Show this grade on your site</span>
+      </summary>
+      <div className="space-y-3 border-t border-border p-3">
+        <p className="text-sm">
+          A small image with this domain's grade from the daily check, linking to its report. Anyone can see the grade while it's on; turn it off any time.
+        </p>
+        <label className="flex min-h-11 items-center gap-3 text-sm">
+          <input type="checkbox" checked={d.badgePublic} disabled={busy} onChange={(e) => void toggle(e.target.checked)} className="size-5 accent-accent" />
+          Publish the grade badge
+        </label>
+        {d.badgePublic && (
+          <>
+            <img src={`/api/badge/${d.domain}.svg`} alt={alt} height={20} />
+            <CodeBlock label="Markdown (README)">{`[![${alt}](${image})](${link})`}</CodeBlock>
+            <CodeBlock label="HTML">{`<a href="${link}"><img src="${image}" alt="${alt}" height="20"></a>`}</CodeBlock>
+            <p className="text-sm text-muted">Badges refresh within an hour of each daily check.</p>
+          </>
+        )}
+        {error && (
+          <p aria-live="polite" className="flex items-start gap-2 text-sm">
+            <Badge tone="warn">Error</Badge>
+            <span>{error}</span>
+          </p>
+        )}
       </div>
     </details>
   );
@@ -83,6 +135,7 @@ function DomainRow({ d, onChange, onRemoved, onCheck }: { d: SavedDomain; onChan
         </p>
       )}
       {d.verified && <Lookalikes d={d} />}
+      {d.verified && <BadgeSettings d={d} onChange={onChange} />}
       {!d.verified && (
         <div className="space-y-2">
           <p className="text-sm">

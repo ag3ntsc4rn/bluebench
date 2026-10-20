@@ -21,6 +21,7 @@ import {
   type LookupResponse,
 } from "@bluebench/shared";
 import { account } from "./account.ts";
+import { BADGE_CACHE_SECONDS, badgeSvg, publicGrade } from "./badge.ts";
 import { accountsEnabled, db } from "./auth.ts";
 import { relay } from "./byo.ts";
 import type { Env } from "./env.ts";
@@ -30,6 +31,7 @@ import { lookup } from "./lookup.ts";
 import { tick } from "./monitor/run.ts";
 import { serviceStatus } from "./monitor/watchdog.ts";
 import { SESSION_COOKIE, SESSION_TTL_SECONDS, signSession, verifyTurnstile } from "./session.ts";
+import { SHARE_PREFIX, sharePage } from "./share.ts";
 
 export { ProviderQuota, UsageCounter } from "./quota.ts";
 export type { Env };
@@ -223,6 +225,28 @@ app.post("/domain", async (c) => {
   return c.json<DomainReport>(report);
 });
 
+/**
+ * Grade badge for a domain whose owner published it (see badge.ts). Public and cheap: the edge cache
+ * answers repeat views for an hour, so most never reach D1.
+ */
+app.get("/badge/:file", async (c) => {
+  const name = /^(.+)\.svg$/.exec(c.req.param("file"))?.[1];
+  const domain = name ? canonicalDomain(name) : null;
+  if (!domain) return fail(c, 404, { error: "invalid", message: "Badges live at /api/badge/<domain>.svg." });
+  const cache = caches.default;
+  const key = new Request(new URL(`/api/badge/${domain}.svg`, c.req.url));
+  const hit = await cache.match(key).catch(() => undefined);
+  if (hit) return hit;
+  const grade = await publicGrade(c.env, domain).catch(() => null);
+  // "Not public" is kept only briefly, so a badge its owner has just published shows up soon.
+  const res = new Response(badgeSvg(grade), {
+    headers: { "content-type": "image/svg+xml; charset=utf-8", "cache-control": `public, max-age=${grade ? BADGE_CACHE_SECONDS : 300}` },
+  });
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.headers.set(k, v);
+  if (grade) c.executionCtx.waitUntil(cache.put(key, res.clone()).catch(() => {}));
+  return res;
+});
+
 app.route("/", account);
 
 app.notFound((c) => c.json({ ok: false, error: "Not found" }, 404));
@@ -231,7 +255,12 @@ app.notFound((c) => c.json({ ok: false, error: "Not found" }, 404));
 app.onError((_err, c) => c.json({ ok: false, error: "Internal error" }, 500));
 
 export default {
-  fetch: app.fetch,
+  /** /api/* is the API; /domain-checker/<domain> is a shareable report page (wrangler.jsonc routes both here). */
+  fetch(req, env, ctx) {
+    const { pathname } = new URL(req.url);
+    if (pathname.startsWith(SHARE_PREFIX) && (req.method === "GET" || req.method === "HEAD")) return sharePage(req, env);
+    return app.fetch(req, env, ctx);
+  },
   /** Every minute: deliver pending alerts, or re-check the next due domain (see monitor/run.ts). */
   async scheduled(controller, env, ctx) {
     await tick(env, { now: controller.scheduledTime, waitUntil: (p) => ctx.waitUntil(p) });

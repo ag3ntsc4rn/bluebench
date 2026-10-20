@@ -13,7 +13,7 @@ import { RunbookPage } from "./pages/RunbookPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SignInPage } from "./pages/SignInPage";
 import { Explainer, ToolPage } from "./pages/ToolPage";
-import { DOMAINS, DONATE_URL, metaFor, pageForPath, pathOf, SOURCE_URL, TOOLS, type Page } from "./routes";
+import { DOMAINS, DONATE_URL, metaFor, pageForPath, pathOf, reportPath, SOURCE_URL, TOOLS, type Page } from "./routes";
 import { TABS, type TabId } from "./tabs";
 
 // Tool pages belong to the Lookup tab, the domain checker to Domains; Privacy, About, Settings, sign-in and 404 to none.
@@ -76,7 +76,17 @@ export function App({ initialTab = "lookup", initialPath }: { initialTab?: TabId
   else if (page.kind === "domains")
     content = (
       <div className="space-y-8">
-        <DomainsPage heading={DOMAINS.h1} lead={DOMAINS.lead} />
+        <DomainsPage
+          heading={DOMAINS.h1}
+          lead={DOMAINS.lead}
+          initialDomain={page.domain}
+          // Put the report's own link in the address bar, so copying it shares the report.
+          onReport={(domain) => {
+            if (location.pathname === reportPath(domain)) return;
+            history.replaceState(null, "", reportPath(domain));
+            setPage({ kind: "domains", domain });
+          }}
+        />
         <Explainer sections={DOMAINS.sections} />
       </div>
     );

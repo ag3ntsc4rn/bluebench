@@ -28,6 +28,13 @@ describe("prerender", () => {
     expect(html.match(/<meta name="description"/g)).toHaveLength(1);
   });
 
+  it("gives the domain checker every tag the Worker rewrites for share links (apps/api/src/share.ts)", () => {
+    const html = byFile["domain-checker.html"]!;
+    for (const tag of ["<title>", '<meta name="description"', '<link rel="canonical"', '<meta property="og:title"', '<meta property="og:description"', '<meta property="og:url"']) {
+      expect(html.split(tag), tag).toHaveLength(2);
+    }
+  });
+
   it("puts real content in the root for crawlers", () => {
     expect(byFile["jwt-decoder.html"]).toMatch(/<div id="root">.*<h1[^>]*>JWT decoder<\/h1>/s);
     expect(byFile["index.html"]).toContain('href="/email-header-analyzer"');

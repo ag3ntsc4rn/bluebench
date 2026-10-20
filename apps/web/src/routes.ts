@@ -4,6 +4,7 @@
  * write sitemap.xml. Add a route here and it gets all of that.
  */
 
+import { canonicalDomain } from "@bluebench/shared";
 import { RUNBOOKS, type Runbook } from "./runbooks";
 
 export const SITE_URL = "https://bluebench.dev";
@@ -333,11 +334,15 @@ export type Page =
   | { kind: "intel" }
   | { kind: "runbook"; runbook: Runbook }
   | { kind: "settings" }
-  | { kind: "domains" }
+  /** With a domain: a shareable report link, /domain-checker/<domain> (noindex, served by the Worker). */
+  | { kind: "domains"; domain?: string }
   | { kind: "alerts" }
   | { kind: "signin" }
   | { kind: "tool"; tool: ToolRoute }
   | { kind: "notfound" };
+
+/** A shareable report link for one domain (see apps/api/src/share.ts). */
+export const reportPath = (domain: string) => `${DOMAINS.path}/${domain}`;
 
 export function pageForPath(path: string): Page {
   const p = path.replace(/\/+$/, "") || "/";
@@ -350,6 +355,16 @@ export function pageForPath(path: string): Page {
   if (runbook) return { kind: "runbook", runbook };
   if (p === SETTINGS.path) return { kind: "settings" };
   if (p === DOMAINS.path) return { kind: "domains" };
+  if (p.startsWith(`${DOMAINS.path}/`)) {
+    let raw = "";
+    try {
+      raw = decodeURIComponent(p.slice(DOMAINS.path.length + 1));
+    } catch {
+      // A malformed link: not a domain.
+    }
+    const domain = raw.includes("/") ? null : canonicalDomain(raw);
+    return domain ? { kind: "domains", domain } : { kind: "notfound" };
+  }
   if (p === ALERTS.path) return { kind: "alerts" };
   if (p === SIGNIN.path) return { kind: "signin" };
   const tool = TOOLS.find((t) => t.path === p);
@@ -373,7 +388,7 @@ export function metaFor(page: Page): PageMeta {
     case "settings":
       return SETTINGS;
     case "domains":
-      return DOMAINS;
+      return page.domain ? { ...DOMAINS, path: reportPath(page.domain), title: `${page.domain} security report card | Bluebench` } : DOMAINS;
     case "alerts":
       return ALERTS;
     case "signin":

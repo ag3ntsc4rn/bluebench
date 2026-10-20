@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 export const PRIVACY_CONTACT = "privacy@bluebench.dev";
-export const PRIVACY_UPDATED = "12 October 2026";
+export const PRIVACY_UPDATED = "20 October 2026";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -169,6 +169,18 @@ export function PrivacyPage() {
           </li>
         </ul>
         <p>It never scans ports or crawls beyond the home page.</p>
+        <p>
+          <strong>Report links.</strong> Every report has its own link (bluebench.dev/domain-checker/ and the domain), so
+          you can share it. Opening one runs the same check, as if you'd typed the domain in. Anyone with the link can do
+          that, since domain checks only use public information. These pages ask search engines not to list them, and we
+          don't keep a list of which domains were checked or shared.
+        </p>
+        <p>
+          <strong>Grade badges.</strong> If you turn on the badge for a domain you've verified, its grade from the daily
+          check becomes public at bluebench.dev/api/badge/ and the domain name, for anyone to see or embed. Only the grade
+          letter is shown. It's off until you turn it on, and turning it off (or removing the domain) hides it again;
+          copies already fetched may be cached for up to an hour.
+        </p>
       </Section>
 
       <Section title="What we store, and for how long">

@@ -30,6 +30,11 @@ export const AccountSettingsSchema = z.strictObject({
   emailAlerts: z.boolean(),
 });
 
+/** PATCH /api/domains/:id: per-domain settings. */
+export const DomainSettingsSchema = z.strictObject({
+  badgePublic: z.boolean(),
+});
+
 /**
  * Hosts of the browser push services we deliver to. A subscription endpoint is a URL our server
  * will POST to, so anything else is refused (otherwise it's an SSRF hole).
@@ -94,6 +99,8 @@ export interface SavedDomain {
   lookalikes: LookalikeHit[];
   /** When the last full lookalike scan finished; null until the first one. */
   lookalikesScannedAt: string | null;
+  /** The owner chose to publish the grade badge (only possible while verified). */
+  badgePublic: boolean;
   createdAt: string;
 }
 
