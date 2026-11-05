@@ -21,7 +21,8 @@ export type ToolSlug =
   | "jwt-decoder"
   | "email-header-analyzer"
   | "base64-decoder"
-  | "url-decoder";
+  | "url-decoder"
+  | "powershell-decoder";
 
 export interface ToolSection {
   heading: string;
@@ -302,6 +303,36 @@ export const TOOLS: readonly ToolRoute[] = [
         ],
       },
       { heading: "Links aren't visited", paragraphs: ["Bluebench never opens the link. " + PRIVATE] },
+    ],
+  },
+  {
+    slug: "powershell-decoder",
+    path: "/powershell-decoder",
+    name: "PowerShell decoder",
+    title: "PowerShell -EncodedCommand decoder: unwrap base64 and gzip layers | Bluebench",
+    description:
+      "Decode powershell -enc commands and peel nested base64, gzip and deflate layers down to the real script, with attack techniques flagged. Runs in your browser.",
+    h1: "PowerShell decoder",
+    lead: "Paste a command line with -EncodedCommand (or -enc, -e), or a log line that contains one, to see the script it really runs.",
+    placeholder: "e.g. powershell.exe -NoP -W Hidden -Enc JABzAD0A…",
+    // Two layers (UTF-16LE base64, then gzip) around a script that only names example.com. Built by
+    // gzipping the inner script with Node's zlib, so it's reproducible.
+    example: "powershell.exe -NoP -W Hidden -Enc JABzAD0AJwBIADQAcwBJAEEAQQBBAEEAQQBBAEEAQwBFADAAVwBOAE0AUQB2AEMATQBCAFEARwA5AC8ANgBLAFIAeQBoADAAYQBvAE4AcgB3AFUAVgBRAGMAQwBpAEsARgBMAHEANABwAFAAVwBEAEIASgBNADAATgB1ADgAVgBmADcANABWAEIATwBHAG0AZwArAE8ARwB4AFQASABxAGkAMwBBAFMASgB0AFYAYgBsADIAbgBEAGsARABWAEwAOABNAGkAWgBEAGwANAB3AEkAawA2AFcAOABEAFkAaABlAGEAaQBpAEYATgBwAFQAWgBaAGwAVABiAHIAWAArADYAVwBhAGEAZwA1AGIAMABNAEkAdwBtADUAVgAxAFYAbgBPAE0ANgBQADEARQBQAEcARwA5ADQAQwBUAEwAVAAxAG4AMQBQAEoAKwBkAEIAcQBrAFIAYwAyAC8ANwBZAFgAZQAvAC8AUwBIADAAQQBDAHgAVQArAGoAbwA0AEEAQQBBAEEAPQAnADsASQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABJAE8ALgBTAHQAcgBlAGEAbQBSAGUAYQBkAGUAcgAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABJAE8ALgBDAG8AbQBwAHIAZQBzAHMAaQBvAG4ALgBHAHoAaQBwAFMAdAByAGUAYQBtACgAWwBJAE8ALgBNAGUAbQBvAHIAeQBTAHQAcgBlAGEAbQBdAFsAQwBvAG4AdgBlAHIAdABdADoAOgBGAHIAbwBtAEIAYQBzAGUANgA0AFMAdAByAGkAbgBnACgAJABzACkALABbAEkATwAuAEMAbwBtAHAAcgBlAHMAcwBpAG8AbgAuAEMAbwBtAHAAcgBlAHMAcwBpAG8AbgBNAG8AZABlAF0AOgA6AEQAZQBjAG8AbQBwAHIAZQBzAHMAKQApACkALgBSAGUAYQBkAFQAbwBFAG4AZAAoACkA",
+    sections: [
+      {
+        heading: "What it shows",
+        paragraphs: [
+          "Attackers hide PowerShell in layers: base64 for -EncodedCommand, then FromBase64String with gzip or deflate inside. Bluebench peels each layer, up to 8 deep, until it reaches the script that would actually run, and keeps every layer so you can follow the chain.",
+          "Common techniques are flagged in plain English: download-and-run cradles, Invoke-Expression, switching off AMSI or Defender, loading code into memory, persistence, hidden windows and execution policy bypasses. Hidden files such as executables are named, with a hex dump.",
+          "Every URL, domain, IP and hash in the script is listed, ready to check against threat intelligence.",
+        ],
+      },
+      {
+        heading: "Nothing is run",
+        paragraphs: [
+          "The script is only decoded, never run, and its links are never visited. Decompression is capped at 1 MB a layer, so a decompression bomb can't freeze the page. " + PRIVATE,
+        ],
+      },
     ],
   },
 ];
