@@ -17,7 +17,8 @@ export type IndicatorKind =
   | "jwt"
   | "base64"
   | "url-encoded"
-  | "email-headers";
+  | "email-headers"
+  | "powershell";
 
 export const KIND_LABELS: Readonly<Record<IndicatorKind, string>> = {
   ipv4: "IPv4 address",
@@ -32,6 +33,7 @@ export const KIND_LABELS: Readonly<Record<IndicatorKind, string>> = {
   base64: "Base64",
   "url-encoded": "URL-encoded text",
   "email-headers": "Email headers",
+  powershell: "PowerShell encoded command",
 };
 
 export interface Detection {
@@ -76,6 +78,24 @@ export function looksLikeEmailHeaders(text: string): boolean {
     if (KNOWN_HEADERS.has(m[1]!.toLowerCase())) known++;
   }
   return fields >= 3 && known >= 2;
+}
+
+/**
+ * The base64 argument of a PowerShell encoded-command flag, if the text runs powershell or pwsh with one.
+ * PowerShell takes any prefix of -EncodedCommand (-e, -en, -enc, …) or -ec, with - or / (and the dashes
+ * Word turns them into). cmd's ^ escapes are ignored.
+ */
+export function findEncodedCommand(text: string): string | null {
+  const s = text.replace(/\^/g, "");
+  const exe = /\b(?:powershell|pwsh)(?:\.exe)?\b/i.exec(s);
+  if (!exe) return null;
+  const flag = /(?:^|\s)[-/–—]([a-z]+)\s+["']?([A-Za-z0-9+/]{8,}={0,2})(?=["'\s]|$)/gi;
+  flag.lastIndex = exe.index + exe[0].length;
+  for (let m = flag.exec(s); m; m = flag.exec(s)) {
+    const name = m[1]!.toLowerCase();
+    if (name === "ec" || "encodedcommand".startsWith(name)) return base64ToBytes(m[2]!) ? m[2]! : null;
+  }
+  return null;
 }
 
 const BASE64URL_SEGMENT = /^[A-Za-z0-9_-]+$/;
@@ -147,8 +167,11 @@ export function detect(input: string): Detection[] {
   const trimmed = input.trim();
   if (!trimmed) return [];
 
+  if (/\n/.test(trimmed) && looksLikeEmailHeaders(trimmed)) return [{ kind: "email-headers", value: trimmed, refanged: false }];
+  // A command line, or a log or alert that contains one.
+  if (findEncodedCommand(trimmed)) return [{ kind: "powershell", value: trimmed, refanged: false }];
+
   if (/\n/.test(trimmed)) {
-    if (looksLikeEmailHeaders(trimmed)) return [{ kind: "email-headers", value: trimmed, refanged: false }];
     // Base64 is often wrapped at 64 or 76 columns.
     const joined = trimmed.replace(/\s+/g, "");
     return isBase64(joined) ? [{ kind: "base64", value: joined, refanged: false }] : [];

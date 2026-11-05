@@ -5,6 +5,7 @@ import { BulkTool } from "../components/tools/BulkTool";
 import { HeaderTool } from "../components/tools/HeaderTool";
 import { IndicatorTool } from "../components/tools/IndicatorTool";
 import { JwtTool } from "../components/tools/JwtTool";
+import { PowerShellTool } from "../components/tools/PowerShellTool";
 import { UrlDecodeTool, UrlTool } from "../components/tools/UrlTool";
 import { AppLink, navigate } from "../components/AppLink";
 import { looksLikeFullMessage } from "../lib/mime";
@@ -42,6 +43,7 @@ const CHIP_LABELS: Partial<Record<IndicatorKind, string>> = {
   sha256: "SHA-256",
   email: "Email address",
   "url-encoded": "URL decode",
+  powershell: "PowerShell",
 };
 
 function Chip({ pressed, onClick, children }: { pressed: boolean; onClick: () => void; children: ReactNode }) {
@@ -72,6 +74,8 @@ function Tool({ detection, onUseAsInput }: { detection: Detection; onUseAsInput:
       return <UrlDecodeTool text={detection.value} />;
     case "email-headers":
       return <HeaderTool raw={detection.value} />;
+    case "powershell":
+      return <PowerShellTool command={detection.value} onUseAsInput={onUseAsInput} />;
     default:
       return <IndicatorTool detection={detection} />;
   }
@@ -96,7 +100,7 @@ const BULK = "bulk" as const;
 export function LookupPage({
   initialValue = "",
   heading = "Lookup",
-  lead = "Paste an IP, domain, URL, hash, email address, JWT, base64, email headers or a whole email.",
+  lead = "Paste an IP, domain, URL, hash, email address, JWT, base64, a PowerShell command, email headers or a whole email.",
   example,
   placeholder = "e.g. 203.0.113.7, example.com, a JWT or a whole email with its headers",
   preferBulk = false,

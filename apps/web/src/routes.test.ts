@@ -1,6 +1,7 @@
 import { detect, extractIndicators } from "@bluebench/shared";
 import { describe, expect, it } from "vitest";
 import { decodeJwt } from "./lib/jwt";
+import { decodePowerShell } from "./lib/powershell";
 import { parseMime } from "./lib/mime";
 import { collectLinks, readHtml, reportAttachment } from "./lib/triage";
 import { ABOUT, ALERTS, DOMAINS, HOME, INTEL, metaFor, pageForPath, pathOf, PRIVACY, RESPOND, SETTINGS, SIGNIN, TOOLS } from "./routes";
@@ -15,6 +16,7 @@ const EXPECTED_KIND = {
   "email-header-analyzer": "email-headers",
   "base64-decoder": "base64",
   "url-decoder": "url",
+  "powershell-decoder": "powershell",
 } as const;
 
 describe("routes", () => {
@@ -49,6 +51,13 @@ describe("routes", () => {
 
   it("the JWT example decodes", () => {
     expect(decodeJwt(TOOLS.find((t) => t.slug === "jwt-decoder")!.example)).not.toBeNull();
+  });
+
+  it("the PowerShell example peels two layers down to a script that only names example.com", async () => {
+    const d = (await decodePowerShell(TOOLS.find((t) => t.slug === "powershell-decoder")!.example))!;
+    expect(d.layers.map((l) => l.how)).toEqual(["Base64 (-EncodedCommand)", "Base64, then gzip"]);
+    expect(d.layers[1]!.text).toContain("harmless Bluebench example");
+    expect(extractIndicators(d.layers.map((l) => l.text).join("\n")).map((e) => e.value)).toEqual(["https://example.com/update.ps1"]);
   });
 
   it("every page has a unique path and title, and a search-friendly description", () => {
