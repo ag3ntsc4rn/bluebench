@@ -2,7 +2,9 @@ name: Watchdog
 
 # The Worker's hourly self-test (monitor/watchdog.ts) alerts the owner about outside services, but it
 # can't report its own death. This checks from outside that the site answers and the self-test has run
-# in the last 3 hours. A failed run makes GitHub email the repository owner. Deploys nothing.
+# in the last 3 hours, and that no third-party script has been added to the pages (Cloudflare's Web
+# Analytics/RUM inserts one when it's switched on for the zone). A failed run makes GitHub email the
+# repository owner. Deploys nothing.
 on:
   schedule:
     - cron: "20 */6 * * *"
@@ -27,3 +29,18 @@ jobs:
           failing=$(echo "$body" | jq -r '[.checks[] | select(.state == "failing") | .label] | join(", ")')
           if [ -n "$failing" ]; then echo "::warning::Failing: $failing (the owner gets a push or email for these)"; fi
           curl -fsS --max-time 30 -o /dev/null https://bluebench.dev/
+
+      # Cloudflare inserts its beacon only into HTML for browsers, so ask like one. Our pages load scripts
+      # only from /assets (Turnstile is added at run time, not in the HTML), so an absolute script URL or a
+      # /cdn-cgi/ one (Rocket Loader, email obfuscation) is something an edge feature put there.
+      - name: No third-party scripts in the pages
+        run: |
+          set -euo pipefail
+          ua="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36"
+          bad=0
+          for path in / /about /ioc-lookup; do
+            html=$(curl -fsS --max-time 30 -A "$ua" -H "Accept: text/html" "https://bluebench.dev$path")
+            found=$(echo "$html" | grep -oiE '<script[^>]+src="((https?:)?//|/cdn-cgi/)[^"]+"' || true)
+            if [ -n "$found" ]; then echo "::error::$path has a third-party script: $found"; bad=1; fi
+          done
+          if [ "$bad" -ne 0 ]; then echo "::error::Turn off Web Analytics / RUM for the zone (see CLAUDE.md, Edge)"; exit 1; fi
