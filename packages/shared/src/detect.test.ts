@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detect, looksLikeEmailHeaders, MAX_PASTE_LENGTH, refang, sniffFileType } from "./detect.ts";
+import { detect, findEncodedCommand, looksLikeEmailHeaders, MAX_PASTE_LENGTH, refang, sniffFileType } from "./detect.ts";
 import { normalizeDomain, orgDomain } from "./domain.ts";
 import { base64ToBytes, bytesToText } from "./encoding.ts";
 
@@ -118,6 +118,33 @@ describe("looksLikeEmailHeaders", () => {
     expect(looksLikeEmailHeaders(HEADERS)).toBe(true);
     expect(looksLikeEmailHeaders("Foo: 1\nBar: 2\nBaz: 3")).toBe(false);
     expect(looksLikeEmailHeaders("Subject: x\n\nFrom: y\nTo: z")).toBe(false); // only one field before the blank line
+  });
+});
+
+describe("findEncodedCommand", () => {
+  // Write-Host "hi", as UTF-16LE base64
+  const B64 = "VwByAGkAdABlAC0ASABvAHMAdAAgACIAaABpACIA";
+
+  it("finds the argument of any spelling of -EncodedCommand", () => {
+    for (const flag of ["-e", "-en", "-enc", "-EncodedCommand", "-ec", "/enc", "\u2013enc"]) {
+      expect(findEncodedCommand(`powershell.exe -nop ${flag} ${B64}`), flag).toBe(B64);
+    }
+    expect(findEncodedCommand(`"C:\\Windows\\pwsh.exe" -NoProfile -WindowStyle Hidden -Enc "${B64}"`)).toBe(B64);
+    expect(findEncodedCommand(`cmd /c p^ower^shell -e^nc ${B64}`)).toBe(B64);
+  });
+
+  it("needs powershell or pwsh, a real encoded-command flag and valid base64", () => {
+    expect(findEncodedCommand(`curl -e ${B64}`)).toBeNull();
+    expect(findEncodedCommand(`powershell -ExecutionPolicy ${B64}`)).toBeNull();
+    expect(findEncodedCommand(`powershell -ea ${B64}`)).toBeNull(); // -EncodedArguments
+    expect(findEncodedCommand(`-enc ${B64} powershell`)).toBeNull();
+    expect(findEncodedCommand("powershell -enc abc=defgh")).toBeNull();
+  });
+
+  it("is detected on its own and inside a log line, ahead of everything else", () => {
+    expect(kinds(`powershell -enc ${B64}`)).toEqual(["powershell"]);
+    expect(kinds(`EventID: 4688\nProcess: powershell.exe\nCommandLine: powershell.exe -w hidden -enc ${B64}`)).toEqual(["powershell"]);
+    expect(kinds(B64)).toEqual(["base64"]);
   });
 });
 
