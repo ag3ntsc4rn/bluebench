@@ -1,7 +1,7 @@
-import { classifyIp, isLookupKind, KIND_LABELS, parseIp, type Detection } from "@bluebench/shared";
+import { classifyIp, isLookupKind, isReservedIndicator, KIND_LABELS, parseIp, type Detection } from "@bluebench/shared";
 import type { ReactNode } from "react";
 import { Badge, CopyButton, Facts, Panel } from "../ui";
-import { Reputation } from "./Reputation";
+import { Reputation, ReservedNameNote } from "./Reputation";
 
 /** IPs, domains, hashes and email addresses: the normalized value, plus an opt-in reputation check. */
 export function IndicatorTool({ detection }: { detection: Detection }) {
@@ -33,7 +33,11 @@ export function IndicatorTool({ detection }: { detection: Detection }) {
           This is a special-purpose address, not a host on the public internet. Reputation services won't know it.
         </p>
       )}
-      {isLookupKind(kind) && (!ipClass || ipClass.global) && <Reputation kind={kind} value={value} />}
+      {isReservedIndicator(kind, value) ? (
+        <ReservedNameNote />
+      ) : (
+        isLookupKind(kind) && (!ipClass || ipClass.global) && <Reputation kind={kind} value={value} />
+      )}
       {kind === "email" && (
         <p className="text-sm text-muted">To check reputation, paste just the domain after the @.</p>
       )}

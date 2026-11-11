@@ -168,3 +168,49 @@ describe("analyzeHeaders", () => {
     expect(bare.findings.map((f) => f.title)).toEqual(["No authentication results"]);
   });
 });
+
+describe("brand impersonation", () => {
+  const withFrom = (from: string, domain: string) =>
+    `Authentication-Results: mx.victim.org; spf=pass smtp.mailfrom=${domain}; dkim=pass header.d=${domain}; dmarc=pass header.from=${domain}
+DKIM-Signature: v=1; d=${domain}; s=s1; b=x
+From: ${from}
+Message-ID: <1@${domain}>`;
+  const titles = (raw: string) => analyzeHeaders(raw).findings.map((f) => `${f.severity}: ${f.title}`);
+
+  it("flags a brand display name and a look-alike domain even when everything passes", () => {
+    const t = titles(withFrom(`"Microsoft 365 Security" <no-reply@micros0ft-support.com>`, "micros0ft-support.com"));
+    expect(t).toContain("critical: Name says Microsoft, address doesn't");
+    expect(t).toContain("critical: Sender domain imitates Microsoft");
+  });
+
+  it("flags a brand name on a domain it doesn't own", () => {
+    expect(titles(withFrom(`"PayPal Service" <service@billing-notice.net>`, "billing-notice.net"))).toEqual([
+      "critical: Name says PayPal, address doesn't",
+    ]);
+    expect(titles(withFrom(`"Google Security" <alerts.google@gmail.com>`, "gmail.com"))).toContain("critical: Name says Google, address doesn't");
+    expect(titles(withFrom(`"Micr0soft Account Team" <a@notify.example>`, "notify.example"))).toContain("critical: Name says Microsoft, address doesn't");
+  });
+
+  it("flags look-alike and hyphenated brand domains without a display name", () => {
+    expect(titles(withFrom(`<a@paypa1.com>`, "paypa1.com"))).toEqual(["critical: Sender domain imitates PayPal"]);
+    expect(titles(withFrom(`<a@l1nkedin.com>`, "l1nkedin.com"))).toEqual(["critical: Sender domain imitates LinkedIn"]);
+    expect(titles(withFrom(`<a@rnicrosoft.com>`, "rnicrosoft.com"))).toEqual(["critical: Sender domain imitates Microsoft"]);
+    expect(titles(withFrom(`<a@secure-paypal.net>`, "secure-paypal.net"))).toEqual(["critical: Sender domain uses the PayPal name"]);
+    expect(titles(withFrom(`<a@examp1e.com>`, "examp1e.com"))).toEqual(["warning: Sender domain has look-alike characters"]);
+  });
+
+  it("leaves the real brands and unrelated names alone", () => {
+    expect(titles(withFrom(`"Microsoft account team" <account-security-noreply@accountprotection.microsoft.com>`, "accountprotection.microsoft.com"))).toEqual([]);
+    expect(titles(withFrom(`"Microsoft Teams" <noreply@email.teams.microsoft.com>`, "email.teams.microsoft.com"))).toEqual([]);
+    expect(titles(withFrom(`"Amazon.co.uk" <order-update@amazon.co.uk>`, "amazon.co.uk"))).toEqual([]);
+    expect(titles(withFrom(`"Applebee's" <hello@applebees.com>`, "applebees.com"))).toEqual([]);
+    expect(titles(withFrom(`"Support Groups" <a@1password.com>`, "1password.com"))).toEqual([]);
+    expect(titles(withFrom(`"Alice Example" <alice@example.com>`, "example.com"))).toEqual([]);
+  });
+
+  it("doesn't trust a tenant subdomain of a shared host", () => {
+    expect(titles(withFrom(`"Microsoft" <a@contoso.onmicrosoft.com>`, "contoso.onmicrosoft.com"))).toContain(
+      "critical: Name says Microsoft, address doesn't",
+    );
+  });
+});

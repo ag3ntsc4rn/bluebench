@@ -87,7 +87,9 @@ const urlhaus: Provider = {
       const bl = (data.blacklists ?? {}) as Json;
       return {
         status: "listed",
-        summary: `Hosted ${count} known malware URL${count === 1 ? "" : "s"}${online ? `, ${online} still online` : ""}.`,
+        // A host-level hit: some URLs on this host were malicious, which on a shared or compromised
+        // site says little about any other link to it.
+        summary: `Hosted ${count} known malware URL${count === 1 ? "" : "s"}${online ? `, ${online} still online` : ", none online now"}. Shared and hacked sites get listed this way too, so check the full link.`,
         facts: facts(
           ["Malware URLs", count],
           ["First seen", day(data.firstseen)],

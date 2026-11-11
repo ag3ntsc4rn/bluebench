@@ -1,6 +1,7 @@
 import { normalizeDomain } from "./domain.ts";
 import { base64ToBytes, bytesToText, tryParseJson } from "./encoding.ts";
 import { formatIPv4, formatIPv6, parseIPv4, parseIPv6 } from "./ip.ts";
+import { unwrapLink, type LinkWrapper } from "./unwrap.ts";
 
 /** Maximum paste size, in characters. */
 export const MAX_PASTE_LENGTH = 65536;
@@ -42,6 +43,8 @@ export interface Detection {
   value: string;
   /** True if the input was defanged (hxxp, [.]) and we refanged it. */
   refanged: boolean;
+  /** Set when the input was a link-protection wrapper (Safe Links etc.) and `value` is what it wraps. */
+  unwrapped?: LinkWrapper;
 }
 
 /** Undo common defanging: hxxp(s), [.], (.), {.}, [dot], [:], [@], [at]. */
@@ -140,6 +143,9 @@ function isBase64(s: string): boolean {
 }
 
 function detectUrl(s: string): string | null {
+  // A URL ends at whitespace. new URL() would otherwise fold whatever follows on the line (an IP,
+  // a hash) into the path or query as %20-separated text, and we'd check a URL that doesn't exist.
+  if (/\s/.test(s)) return null;
   let candidate = s;
   if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) {
     // Bare host followed by a path, query or port, e.g. example.com/login
@@ -198,7 +204,11 @@ export function detect(input: string): Detection[] {
   if (email && emailDomain) add("email", `${email[1]}@${emailDomain}`);
 
   const url = detectUrl(value);
-  if (url) add("url", url);
+  const inner = url ? unwrapLink(url) : null;
+  // A wrapped link is analysed as the link inside: the wrapper is the email gateway's own server.
+  if (inner?.url) out.push({ kind: "url", value: inner.url, refanged, unwrapped: inner.wrapper });
+  else if (inner) out.push({ kind: "domain", value: inner.host, refanged, unwrapped: inner.wrapper });
+  else if (url) add("url", url);
 
   if (out.length === 0) {
     const domain = normalizeDomain(value);

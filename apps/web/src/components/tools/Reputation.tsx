@@ -127,6 +127,16 @@ export function ownKeysNote(own: ByoSourceId[]): string {
 }
 
 /** Opt-in reputation lookup: nothing leaves the browser until the button is pressed. */
+/** Shown instead of a reputation check for example.com, *.test and other reserved names. */
+export function ReservedNameNote() {
+  return (
+    <p className="text-sm text-muted">
+      This name is reserved for documentation and testing (like example.com or .test), so it can't belong to an attacker.
+      Reputation lists sometimes mention it only because people submit sample links, so it isn't checked.
+    </p>
+  );
+}
+
 export function Reputation({ kind, value }: { kind: LookupKind; value: string }) {
   const [state, setState] = useState<State>({ phase: "idle" });
   const challengeRef = useRef<HTMLDivElement>(null);

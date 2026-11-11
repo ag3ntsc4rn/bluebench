@@ -117,7 +117,7 @@ describe("POST /api/lookup", () => {
     const bySource = Object.fromEntries(body.sources.map((s) => [s.source, s]));
     expect(bySource.urlhaus).toMatchObject({
       status: "listed",
-      summary: "Hosted 3 known malware URLs, 1 still online.",
+      summary: "Hosted 3 known malware URLs, 1 still online. Shared and hacked sites get listed this way too, so check the full link.",
       link: "https://urlhaus.abuse.ch/host/bad.example/",
     });
     expect(bySource.threatfox!.status).toBe("not-listed");

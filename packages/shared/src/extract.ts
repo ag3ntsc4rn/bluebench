@@ -3,6 +3,7 @@ import { normalizeDomain } from "./domain.ts";
 import { formatIPv4, formatIPv6, parseIPv4, parseIPv6 } from "./ip.ts";
 import { mergeVerdict, SOURCE_LABELS, type LookupResponse, type Verdict } from "./lookup.ts";
 import { TLDS } from "./tlds.ts";
+import { unwrapLink } from "./unwrap.ts";
 
 /**
  * Bulk IOC extraction: pull every indicator out of pasted text (a report, an email, a log excerpt),
@@ -52,7 +53,12 @@ export function extractIndicators(input: string, max = MAX_EXTRACTED): Extracted
     const raw = m.replace(TRAILING, "");
     try {
       const url = new URL(raw);
-      if (url.hostname) add("url", url.href);
+      if (!url.hostname) return;
+      // Link-protection wrappers (Safe Links, Proofpoint, Mimecast): list what they wrap instead.
+      const inner = unwrapLink(url.href);
+      if (inner?.url) add("url", inner.url);
+      else if (inner) add("domain", inner.host);
+      else add("url", url.href);
     } catch {
       // not a URL after all
     }

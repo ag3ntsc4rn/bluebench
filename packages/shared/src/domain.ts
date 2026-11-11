@@ -75,3 +75,30 @@ export function orgDomain(domain: string): string {
   }
   return labels.slice(-2).join(".");
 }
+
+/** Top-level names reserved by RFC 2606, RFC 6761 and RFC 6762, plus ICANN's private-use .internal. */
+const RESERVED_TLDS = new Set(["test", "example", "invalid", "localhost", "local", "internal"]);
+/** Second-level names reserved for documentation (RFC 2606) and home networks (RFC 8375). */
+const RESERVED_NAMES = ["example.com", "example.net", "example.org", "home.arpa"];
+
+/**
+ * Names reserved for documentation, testing or private networks (example.com, *.test, *.local…).
+ * They can never be someone's phishing site, so the browser doesn't spend a reputation lookup on
+ * them: example.com in particular is in URLhaus as a host, because people submit sample links.
+ */
+export function isReservedDomain(host: string): boolean {
+  const d = host.toLowerCase().replace(/\.$/, "");
+  if (RESERVED_TLDS.has(d.slice(d.lastIndexOf(".") + 1))) return true;
+  return RESERVED_NAMES.some((n) => d === n || d.endsWith(`.${n}`));
+}
+
+/** True for a domain or URL whose host is reserved (see `isReservedDomain`). */
+export function isReservedIndicator(kind: string, value: string): boolean {
+  if (kind === "domain") return isReservedDomain(value);
+  if (kind !== "url") return false;
+  try {
+    return isReservedDomain(new URL(value).hostname);
+  } catch {
+    return false;
+  }
+}
