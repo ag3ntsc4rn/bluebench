@@ -1,4 +1,5 @@
 import { orgDomain } from "@bluebench/shared";
+import { brandInDisplayName, brandInDomain, hasLookalikeDigits, isBrandDomain } from "./brands";
 import { formatDuration, formatUtc, sortFindings, type Finding } from "./findings";
 
 export interface HeaderField {
@@ -60,6 +61,40 @@ export function parseMailbox(value: string): Mailbox | null {
   if (!address) return null;
   const display = angle ? decoded.slice(0, angle.index).trim().replace(/^"(.*)"$/, "$1").trim() : "";
   return { display, address, domain: address.slice(address.lastIndexOf("@") + 1).replace(/[.>]+$/, "") };
+}
+
+/**
+ * A sender pretending to be a brand. SPF, DKIM and DMARC only prove the mail came from the domain
+ * in the address, and anyone can register micros0ft-support.com and make all three pass, so these
+ * findings stand on their own whatever the authentication results say.
+ */
+export function senderImpersonation(from: Mailbox): Finding[] {
+  const out: Finding[] = [];
+  const claimed = brandInDisplayName(from.display);
+  const imitated = brandInDomain(from.domain);
+  if (claimed && !isBrandDomain(claimed, from.domain)) {
+    out.push({
+      severity: "critical",
+      title: `Name says ${claimed.name}, address doesn't`,
+      detail: `The display name mentions ${claimed.name}, but the message was sent from ${from.domain}, which isn't one of ${claimed.name}'s domains. Passing SPF, DKIM or DMARC only proves it came from ${from.domain}.`,
+    });
+  }
+  if (imitated) {
+    out.push({
+      severity: "critical",
+      title: imitated.lookalikeChars ? `Sender domain imitates ${imitated.brand.name}` : `Sender domain uses the ${imitated.brand.name} name`,
+      detail: imitated.lookalikeChars
+        ? `${from.domain} spells ${imitated.brand.name} with look-alike characters (like 0 for o or 1 for l). ${imitated.brand.name} doesn't send from it.`
+        : `${from.domain} isn't one of ${imitated.brand.name}'s domains. Anyone can register a name like this.`,
+    });
+  } else if (hasLookalikeDigits(from.domain)) {
+    out.push({
+      severity: "warning",
+      title: "Sender domain has look-alike characters",
+      detail: `${from.domain} has a 0 or 1 between letters, a common way to imitate another name (examp1e for example). Check it's the domain you expect.`,
+    });
+  }
+  return out;
 }
 
 /** Strip RFC 5322 comments (parenthesised, possibly nested). */
@@ -282,6 +317,7 @@ export function analyzeHeaders(raw: string): HeaderAnalysis {
     if (shown && shown !== from.address) {
       findings.push({ severity: "critical", title: "Display name shows a different address", detail: `The name shows ${shown}, but the real sender is ${from.address}.` });
     }
+    findings.push(...senderImpersonation(from));
   }
   if (backwards) {
     findings.push({ severity: "warning", title: "Hop times go backwards", detail: "A server clock is wrong, or a Received header was forged." });
