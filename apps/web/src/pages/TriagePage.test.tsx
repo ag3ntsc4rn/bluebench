@@ -31,7 +31,9 @@ describe("TriagePage", () => {
     expect(html).toContain("payslip.pdf.html");
     expect(html).toContain("File name hides its real type");
     expect(html).toContain("SPF soft fail"); // header analysis
-    expect(html).toContain("Check reputation for");
+    // Every name in the example is reserved (example.com, .test) and its IPs are documentation
+    // ranges, so nothing is offered for a reputation check until the attachment's hash is ready.
+    expect(html).toContain("None of these can be checked for reputation");
     expect(html).toContain('href="/respond/phishing-link-clicked"');
     // The email's own HTML is never put into the page: its link exists only as text.
     expect(html).not.toContain('<a href="https://example-payroll.test');

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { detect, findEncodedCommand, looksLikeEmailHeaders, MAX_PASTE_LENGTH, refang, sniffFileType } from "./detect.ts";
-import { normalizeDomain, orgDomain } from "./domain.ts";
+import { isReservedDomain, isReservedIndicator, normalizeDomain, orgDomain } from "./domain.ts";
 import { base64ToBytes, bytesToText } from "./encoding.ts";
+import { extractIndicators } from "./extract.ts";
 
 const kinds = (s: string) => detect(s).map((d) => d.kind);
 const first = (s: string) => detect(s)[0];
@@ -67,6 +68,16 @@ describe("detect", () => {
     expect(first("example.com/path")).toMatchObject({ kind: "url", value: "http://example.com/path" });
     expect(first("192.0.2.1:8080/x")).toMatchObject({ kind: "url", value: "http://192.0.2.1:8080/x" });
     expect(kinds("javascript://alert(1)")).not.toContain("url");
+  });
+
+  it("ends a URL at whitespace, leaving the rest of the line to bulk extraction", () => {
+    const line = "https://shop.example.net/a?user=a@example.com 185.220.101.4 d41d8cd98f00b204e9800998ecf8427e";
+    expect(kinds(line)).toEqual([]);
+    expect(extractIndicators(line).map((i) => i.value)).toEqual([
+      "https://shop.example.net/a?user=a@example.com",
+      "185.220.101.4",
+      "d41d8cd98f00b204e9800998ecf8427e",
+    ]);
   });
 
   it("detects hashes by length", () => {
@@ -197,5 +208,23 @@ describe("domains", () => {
     expect(orgDomain("www.victim.github.io")).toBe("victim.github.io");
     expect(orgDomain("github.io")).toBe("github.io");
     expect(orgDomain("api.github.com")).toBe("github.com"); // github.com itself isn't a hosting suffix
+  });
+});
+
+describe("reserved names", () => {
+  it("recognises documentation and special-use names", () => {
+    for (const d of ["example.com", "www.example.com", "EXAMPLE.ORG.", "example-payroll.test", "a.example", "x.invalid", "localhost", "printer.local", "nas.home.arpa", "corp.internal"]) {
+      expect(isReservedDomain(d), d).toBe(true);
+    }
+    for (const d of ["example-payroll.com", "notexample.com", "example.co", "testing.com", "test.com"]) {
+      expect(isReservedDomain(d), d).toBe(false);
+    }
+  });
+
+  it("checks a URL's host", () => {
+    expect(isReservedIndicator("url", "https://example-payroll.test/confirm")).toBe(true);
+    expect(isReservedIndicator("url", "https://www.example.com/payroll")).toBe(true);
+    expect(isReservedIndicator("url", "https://evil.example.net.attacker.io/")).toBe(false);
+    expect(isReservedIndicator("ipv4", "192.0.2.1")).toBe(false);
   });
 });

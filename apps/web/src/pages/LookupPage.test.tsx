@@ -41,6 +41,26 @@ describe("LookupPage", () => {
     expect(html).not.toContain("invoice.pdf</span>");
   });
 
+  it("doesn't fold the rest of a line into a URL", () => {
+    const html = text("https://shop.evil.top/a?user=a@evil.top 185.220.101.4 d41d8cd98f00b204e9800998ecf8427e");
+    expect(html).toMatch(/aria-pressed="true"[^>]*>All indicators \(3\)/);
+    expect(html).not.toContain("%20");
+  });
+
+  it("analyses the link inside a Safe Links wrapper", () => {
+    const inner = "https://evil.top/login";
+    const html = text(`https://nam12.safelinks.protection.outlook.com/?url=${encodeURIComponent(inner)}&data=x&reserved=0`);
+    expect(html).toContain("Unwrapped from Microsoft Safe Links");
+    expect(html).toContain("https://evil.top/login");
+    expect(html).not.toContain("safelinks.protection.outlook.com</");
+  });
+
+  it("doesn't offer a reputation check for reserved names", () => {
+    expect(text("example.com")).toContain("reserved for documentation and testing");
+    expect(text("https://example-payroll.test/confirm")).toContain("reserved for documentation and testing");
+    expect(text("evil.top")).not.toContain("reserved for documentation and testing");
+  });
+
   it("keeps a single indicator on its own tool, without a bulk chip", () => {
     const html = text("198.51.100.7");
     expect(html).not.toContain("All indicators");

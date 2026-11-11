@@ -1,7 +1,8 @@
+import { isReservedIndicator } from "@bluebench/shared";
 import { analyzeUrl, decodeLayers } from "../../lib/url";
 import { summarizeUrl } from "../../lib/summaries";
 import { CodeBlock, CopyButton, Facts, FindingList, Panel } from "../ui";
-import { Reputation } from "./Reputation";
+import { Reputation, ReservedNameNote } from "./Reputation";
 
 export function UrlTool({ href }: { href: string }) {
   const url = analyzeUrl(href);
@@ -26,7 +27,7 @@ export function UrlTool({ href }: { href: string }) {
       )}
       {url.decoded !== url.href && <CodeBlock label="Decoded URL">{url.decoded}</CodeBlock>}
       <CodeBlock label="Normalized URL">{url.href}</CodeBlock>
-      <Reputation kind="url" value={url.href} />
+      {isReservedIndicator("url", url.href) ? <ReservedNameNote /> : <Reputation kind="url" value={url.href} />}
     </Panel>
   );
 }

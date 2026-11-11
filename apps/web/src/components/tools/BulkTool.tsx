@@ -5,6 +5,7 @@ import {
   exportVerdict,
   extractedKey,
   isLookupKind,
+  isReservedIndicator,
   parseIp,
   toCsv,
   toStixBundle,
@@ -47,8 +48,9 @@ const isInternalIp = (i: Extracted) => {
   return ip !== null && !classifyIp(ip).global;
 };
 
-/** Items our sources can answer for: not email addresses, not private or reserved IPs. */
-export const checkable = (i: Extracted): i is Extracted & { kind: LookupKind } => isLookupKind(i.kind) && !isInternalIp(i);
+/** Items our sources can answer for: not email addresses, not private or reserved IPs, not reserved names like example.com. */
+export const checkable = (i: Extracted): i is Extracted & { kind: LookupKind } =>
+  isLookupKind(i.kind) && !isInternalIp(i) && !isReservedIndicator(i.kind, i.value);
 
 /** Row badge. Safe Browsing alone gets hedged wording, as on single lookups. */
 export function resultBadge(r: Result): { tone: Tone; label: string } {
@@ -176,12 +178,16 @@ export function BulkTool({
             </button>
             <p className="text-sm text-muted">
               Sends these {toCheck.length} to our server, and each counts toward today's lookups ({ANON_DAILY_LIMIT} a day, or {USER_DAILY_LIMIT} signed in).
-              {skipped > 0 && ` ${skipped} can't be checked (email addresses and private IPs).`} Your own API keys aren't
+              {skipped > 0 && ` ${skipped} can't be checked (email addresses, private IPs and reserved names like example.com).`} Your own API keys aren't
               used in bulk: open one with Analyse to include them.
             </p>
           </>
+        ) : results.size > 0 ? (
+          <p className="text-sm text-muted">Every indicator that can be checked has been.</p>
         ) : (
-          results.size > 0 && <p className="text-sm text-muted">Every indicator that can be checked has been.</p>
+          <p className="text-sm text-muted">
+            None of these can be checked for reputation: they're email addresses, private IPs or reserved names like example.com.
+          </p>
         )}
         <div aria-live="polite" className="text-sm">
           {running && (

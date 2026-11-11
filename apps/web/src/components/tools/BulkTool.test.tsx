@@ -44,12 +44,14 @@ describe("BulkTool", () => {
           { kind: "ipv4", value: "10.0.0.5" },
           { kind: "email", value: "a@evil.top" },
           { kind: "sha256", value: "a".repeat(64) },
+          { kind: "domain", value: "www.example.com" },
+          { kind: "url", value: "https://example-payroll.test/confirm" },
         ]}
         onUseAsInput={() => {}}
       />,
     ).replace(/<!-- -->/g, "").replace(/&#x27;/g, "'");
     expect(html).toContain("Check reputation for 2");
-    expect(html).toContain("2 can't be checked (email addresses and private IPs)");
+    expect(html).toContain("4 can't be checked (email addresses, private IPs and reserved names like example.com)");
     expect(html).toContain("100 a day, or 300 signed in");
     expect(html).toContain("Exported verdicts leave out Google Safe Browsing");
   });
