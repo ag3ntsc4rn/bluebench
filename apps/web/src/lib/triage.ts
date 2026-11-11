@@ -1,4 +1,4 @@
-import { detect, extractIndicators, orgDomain, parseIp, sniffFileType, type ExportVerdicts, type Extracted, extractedKey } from "@bluebench/shared";
+import { detect, extractIndicators, orgDomain, parseIp, sniffFileType, unwrapLink, type ExportVerdicts, type Extracted, extractedKey } from "@bluebench/shared";
 import type { HeaderAnalysis } from "./email-headers";
 import { formatUtc, sortFindings, type Finding } from "./findings";
 import type { MimeAttachment, ParsedMessage } from "./mime";
@@ -110,7 +110,17 @@ export function linkFindings(href: string, text?: string): Finding[] {
     findings.push({ severity: "warning", title: `Link opens an app (${scheme}:)`, detail: "Not a web page. Some of these handlers have been used to run malware." });
     return findings;
   }
-  const host = hostOf(squashed);
+  // Judge the real destination, not the email gateway's wrapper around it.
+  const inner = unwrapLink(squashed);
+  if (inner) {
+    findings.push({
+      severity: "info",
+      title: `Wrapped by ${inner.wrapper}`,
+      detail: inner.url ? `It really goes to ${inner.url}` : `It goes to a page on ${inner.host}; ${inner.wrapper} hides the rest of the address.`,
+    });
+  }
+  const target = inner?.url ?? squashed;
+  const host = inner?.host ?? hostOf(squashed);
   if (!host) return findings;
   const claimed = text ? claimedHost(text) : null;
   if (claimed && hostKey(claimed) !== hostKey(host)) {
@@ -122,7 +132,7 @@ export function linkFindings(href: string, text?: string): Finding[] {
   }
   if (parseIp(host.replace(/^\[|\]$/g, ""))) findings.push({ severity: "warning", title: "Link goes to a bare IP address", detail: host });
   try {
-    if (new URL(squashed).username) findings.push({ severity: "warning", title: "Link has text before @ in the address", detail: "Everything before the @ is ignored; it's there to look like another site." });
+    if (new URL(target).username) findings.push({ severity: "warning", title: "Link has text before @ in the address", detail: "Everything before the @ is ignored; it's there to look like another site." });
   } catch {
     // hostOf already parsed it
   }

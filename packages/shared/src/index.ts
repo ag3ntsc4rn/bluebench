@@ -11,3 +11,4 @@ export * from "./ip.ts";
 export * from "./lookalike.ts";
 export * from "./lookup.ts";
 export * from "./security-headers.ts";
+export * from "./unwrap.ts";

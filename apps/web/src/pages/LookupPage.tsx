@@ -1,4 +1,4 @@
-import { detect, extractIndicators, KIND_LABELS, MAX_PASTE_LENGTH, type Detection, type IndicatorKind } from "@bluebench/shared";
+import { detect, extractIndicators, KIND_LABELS, MAX_PASTE_LENGTH, type Detection, type Extracted, type IndicatorKind } from "@bluebench/shared";
 import { useDeferredValue, useMemo, useRef, useState, type ReactNode } from "react";
 import { Base64Tool } from "../components/tools/Base64Tool";
 import { BulkTool } from "../components/tools/BulkTool";
@@ -121,9 +121,15 @@ export function LookupPage({
   const resultsRef = useRef<HTMLDivElement>(null);
   const multiline = input.includes("\n");
 
+  // One indicator picked from the bulk list with Analyse. The list stays mounted (hidden), so its
+  // reputation results survive and "Back to all" returns to it as it was.
+  const [single, setSingle] = useState<Extracted | null>(null);
+  const shownSingle = bulk ? single : null;
+
   const replaceInput = (text: string) => {
     setInput(text.slice(0, MAX_PASTE_LENGTH));
     setChosen(null);
+    setSingle(null);
   };
 
   // Detection is already live; this closes the phone keyboard and brings the results into view.
@@ -222,12 +228,25 @@ export function LookupPage({
                 </Chip>
               ))}
               {bulkAvailable && (
-                <Chip pressed={bulk} onClick={() => setChosen(BULK)}>
+                <Chip
+                  pressed={bulk}
+                  onClick={() => {
+                    setChosen(BULK);
+                    setSingle(null);
+                  }}
+                >
                   All indicators ({extracted.length})
                 </Chip>
               )}
             </div>
             {active?.refanged && <p className="text-sm text-muted">Defanged input was refanged for analysis.</p>}
+            {active?.unwrapped && (
+              <p className="text-sm text-muted">
+                {active.kind === "url"
+                  ? `Unwrapped from ${active.unwrapped}: this is the link the email really pointed to.`
+                  : `Unwrapped from ${active.unwrapped}, which hides the full link: only its domain can be checked.`}
+              </p>
+            )}
           </div>
         )}
 
@@ -240,7 +259,36 @@ export function LookupPage({
 
         {active?.kind === "email-headers" && looksLikeFullMessage(deferred) && <TriageOffer message={deferred} />}
         {active && <Tool key={`${active.kind}:${active.value}`} detection={active} onUseAsInput={replaceInput} />}
-        {bulk && <BulkTool items={extracted} onUseAsInput={replaceInput} />}
+        {bulk && (
+          <div hidden={!!shownSingle}>
+            <BulkTool
+              items={extracted}
+              onUseAsInput={(value) => {
+                setSingle(extracted.find((i) => i.value === value) ?? null);
+                showResults();
+              }}
+            />
+          </div>
+        )}
+        {shownSingle && (
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSingle(null);
+                showResults();
+              }}
+              className="min-h-11 rounded-md border border-border px-3 text-sm text-muted hover:text-fg"
+            >
+              ← Back to all {extracted.length} indicators
+            </button>
+            <Tool
+              key={`${shownSingle.kind}:${shownSingle.value}`}
+              detection={detect(shownSingle.value)[0] ?? { kind: shownSingle.kind, value: shownSingle.value, refanged: false }}
+              onUseAsInput={replaceInput}
+            />
+          </div>
+        )}
       </div>
     </section>
   );

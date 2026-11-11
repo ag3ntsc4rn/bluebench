@@ -74,6 +74,20 @@ describe("linkFindings", () => {
     expect(titles(linkFindings("https://xn--exmple-cua.test/", "Open"))).toEqual(["Link uses a punycode (xn--) domain"]);
   });
 
+  it("judges a Safe Links or Mimecast link by where it really goes", () => {
+    const wrap = (u: string) => `https://nam12.safelinks.protection.outlook.com/?url=${encodeURIComponent(u)}&data=x&reserved=0`;
+    expect(titles(linkFindings(wrap("https://www.example.com/account"), "https://www.example.com/account"))).toEqual(["Wrapped by Microsoft Safe Links"]);
+    expect(titles(linkFindings(wrap("https://evil.test/login"), "https://www.example.com/account"))).toEqual([
+      "Wrapped by Microsoft Safe Links",
+      "Link text shows a different site",
+    ]);
+    expect(titles(linkFindings(wrap("https://example.com@evil.test/"), "Open"))).toContain("Link has text before @ in the address");
+    expect(titles(linkFindings("https://protect-eu.mimecast.com/s/AbC?domain=evil.test", "www.example.com"))).toEqual([
+      "Wrapped by Mimecast",
+      "Link text shows a different site",
+    ]);
+  });
+
   it("reads the host a link's text claims", () => {
     expect(claimedHost("https://www.example.com/login")).toBe("www.example.com");
     expect(claimedHost("hxxps://example[.]com")).toBe("example.com");
