@@ -18,7 +18,7 @@ describe("TriagePage", () => {
   it("starts empty, with a labelled box, a file picker and an example", () => {
     const html = render();
     expect(html).toMatch(/<label for="triage-paste"[^>]*>Raw message/);
-    expect(html).toMatch(/<label[^>]*>Choose .eml file<input type="file"/);
+    expect(html).toMatch(/<label[^>]*>Choose .eml or .msg file<input type="file"/);
     expect(html).toContain("Try an example");
     expect(html).not.toContain("Summary");
   });
@@ -61,6 +61,6 @@ describe("drag and drop", () => {
   });
 
   it("says files can be dropped anywhere on the page", () => {
-    expect(render()).toContain("Or drop an .eml file anywhere on this page");
+    expect(render()).toContain("Or drop an .eml or Outlook .msg file anywhere on this page");
   });
 });

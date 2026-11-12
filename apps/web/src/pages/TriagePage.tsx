@@ -7,7 +7,8 @@ import { UrlTool } from "../components/tools/UrlTool";
 import { AppLink } from "../components/AppLink";
 import { Badge, CopyButton, FindingList, Panel } from "../components/ui";
 import { analyzeHeaders } from "../lib/email-headers";
-import { MAX_EML_BYTES, parseMime, type ParsedMessage } from "../lib/mime";
+import { MAX_EML_BYTES, parseMime, type MimeAttachment, type ParsedMessage } from "../lib/mime";
+import { isOpenableMessage, parseMessageFile } from "../lib/msg";
 import {
   clearHandOff,
   collectLinks,
@@ -29,6 +30,8 @@ const PHISHING_RUNBOOK = RUNBOOKS.find((r) => r.slug === "phishing-link-clicked"
 interface LoadedFile {
   name: string;
   bytes: Uint8Array<ArrayBuffer>;
+  /** A message attached inside an Outlook .msg: parsed already, no bytes of its own. */
+  parsed?: ParsedMessage;
 }
 
 function LinkRow({ link }: { link: TriageLink }) {
@@ -58,17 +61,18 @@ function SingleIndicator({ item }: { item: Extracted }) {
   return item.kind === "url" ? <UrlTool href={item.value} /> : <IndicatorTool detection={detection} />;
 }
 
-function TriageResults({ msg, onOpenMessage }: { msg: ParsedMessage; onOpenMessage: (name: string, bytes: Uint8Array<ArrayBuffer>) => void }) {
+function TriageResults({ msg, onOpenMessage }: { msg: ParsedMessage; onOpenMessage: (name: string, attachment: MimeAttachment) => void }) {
   const html = useMemo(() => msg.html.map(readHtml), [msg]);
   const headers = useMemo(() => (msg.headers.trim() ? analyzeHeaders(msg.headers) : null), [msg]);
   const links = useMemo(() => collectLinks(msg, html), [msg, html]);
   const attachments = useMemo(() => msg.attachments.map(reportAttachment), [msg]);
+  const openable = useMemo(() => msg.attachments.map(isOpenableMessage), [msg]);
 
   const [hashes, setHashes] = useState<(string | undefined)[]>([]);
   useEffect(() => {
     let live = true;
     setHashes([]);
-    void Promise.all(msg.attachments.map((a) => sha256Hex(a.bytes).catch(() => undefined))).then((h) => {
+    void Promise.all(msg.attachments.map((a) => (a.message ? Promise.resolve(undefined) : sha256Hex(a.bytes).catch(() => undefined)))).then((h) => {
       if (live) setHashes(h);
     });
     return () => {
@@ -168,7 +172,9 @@ function TriageResults({ msg, onOpenMessage }: { msg: ParsedMessage; onOpenMessa
               <li key={i} className="space-y-2 rounded-md border border-border bg-ground p-3 text-sm">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <span className="min-w-0 font-medium break-all">{a.filename}</span>
-                  {a.findings[0] ? (
+                  {msg.attachments[i]!.message ? (
+                    <Badge tone="neutral">Attached message</Badge>
+                  ) : a.findings[0] ? (
                     <Badge tone={a.findings[0].severity === "critical" ? "critical" : "warn"}>{a.findings[0].severity === "critical" ? "Red flag" : "Warning"}</Badge>
                   ) : (
                     <Badge tone="neutral">Nothing obvious</Badge>
@@ -177,18 +183,27 @@ function TriageResults({ msg, onOpenMessage }: { msg: ParsedMessage; onOpenMessa
                 <dl className="grid grid-cols-[minmax(6rem,40%)_minmax(0,1fr)] gap-x-4 gap-y-1">
                   <dt className="text-muted">Declared type</dt>
                   <dd className="min-w-0 font-mono break-all">{a.contentType}</dd>
-                  <dt className="text-muted">Size</dt>
-                  <dd>{formatSize(a.size)}</dd>
-                  <dt className="text-muted">Content looks like</dt>
-                  <dd>{a.sniffed ?? "Not recognised"}</dd>
-                  <dt className="text-muted">SHA-256</dt>
-                  <dd className="min-w-0 font-mono break-all">{hashes[i] ?? "Calculating…"}</dd>
+                  {msg.attachments[i]!.message ? (
+                    <>
+                      <dt className="text-muted">Content</dt>
+                      <dd>An Outlook message inside this one. Open it to check its sender, links and attachments.</dd>
+                    </>
+                  ) : (
+                    <>
+                      <dt className="text-muted">Size</dt>
+                      <dd>{formatSize(a.size)}</dd>
+                      <dt className="text-muted">Content looks like</dt>
+                      <dd>{a.sniffed ?? "Not recognised"}</dd>
+                      <dt className="text-muted">SHA-256</dt>
+                      <dd className="min-w-0 font-mono break-all">{hashes[i] ?? "Calculating…"}</dd>
+                    </>
+                  )}
                 </dl>
                 {a.findings.length > 0 && <FindingList findings={a.findings} />}
-                {a.contentType === "message/rfc822" && (
+                {openable[i] && (
                   <button
                     type="button"
-                    onClick={() => onOpenMessage(a.filename, msg.attachments[i]!.bytes)}
+                    onClick={() => onOpenMessage(a.filename, msg.attachments[i]!)}
                     className="min-h-11 rounded-md border border-border px-3 text-sm text-muted hover:text-fg"
                   >
                     Triage the attached message
@@ -253,7 +268,11 @@ export function TriagePage({ heading, lead, example, placeholder }: { heading: s
   // Keep typing responsive on big pastes; analysis catches up a frame later.
   const deferred = useDeferredValue(paste);
   const fileBytes = file?.bytes;
-  const msg = useMemo(() => (fileBytes ? parseMime(fileBytes) : deferred.trim() ? parseMime(deferred) : null), [fileBytes, deferred]);
+  const fileParsed = file?.parsed;
+  const msg = useMemo(
+    () => fileParsed ?? (fileBytes ? parseMessageFile(fileBytes) : deferred.trim() ? parseMime(deferred) : null),
+    [fileParsed, fileBytes, deferred],
+  );
   const loaded = Boolean(file) || paste.trim() !== "";
 
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -265,20 +284,15 @@ export function TriagePage({ heading, lead, example, placeholder }: { heading: s
       return;
     }
     try {
-      const bytes = new Uint8Array(await f.arrayBuffer());
-      if (bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0) {
-        setError(`${f.name} is an Outlook .msg file, which can't be read here. In Outlook, save it as .eml, or copy the message source and paste it.`);
-        return;
-      }
-      openBytes(f.name, bytes);
+      openFile({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) });
     } catch {
       setError(`Couldn't read ${f.name}.`);
     }
   };
 
-  const openBytes = (name: string, bytes: Uint8Array<ArrayBuffer>) => {
+  const openFile = (loaded: LoadedFile) => {
     setPaste("");
-    setFile({ name, bytes });
+    setFile(loaded);
     setRun((n) => n + 1);
     requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ block: "start" }));
   };
@@ -347,7 +361,7 @@ export function TriagePage({ heading, lead, example, placeholder }: { heading: s
           <p className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-border bg-ground p-3 text-sm">
             <Badge tone="neutral">File</Badge>
             <span className="min-w-0 font-mono break-all">{file.name}</span>
-            <span className="text-muted">{formatSize(file.bytes.length)}</span>
+            {!file.parsed && <span className="text-muted">{formatSize(file.bytes.length)}</span>}
           </p>
         ) : (
           <textarea
@@ -368,8 +382,8 @@ export function TriagePage({ heading, lead, example, placeholder }: { heading: s
         )}
         <p className="mt-2 text-sm text-muted">
           {paste.length >= MAX_PASTE_LENGTH
-            ? "Limit reached: only the first 64 KB is analysed. For longer messages, choose the .eml file instead."
-            : "Or drop an .eml file anywhere on this page (up to 10 MB). Read in your browser: nothing is sent unless you choose Check reputation."}
+            ? "Limit reached: only the first 64 KB is analysed. For longer messages, choose the .eml or .msg file instead."
+            : "Or drop an .eml or Outlook .msg file anywhere on this page (up to 10 MB). Read in your browser: nothing is sent unless you choose Check reputation."}
         </p>
         {error && (
           <p role="alert" className="mt-2 flex items-start gap-2 text-sm">
@@ -379,10 +393,10 @@ export function TriagePage({ heading, lead, example, placeholder }: { heading: s
         )}
         <div className="mt-3 flex flex-wrap gap-2">
           <label className="inline-flex min-h-11 cursor-pointer items-center rounded-md bg-accent px-4 text-sm font-medium text-on-accent has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-accent">
-            Choose .eml file
+            Choose .eml or .msg file
             <input
               type="file"
-              accept=".eml,message/rfc822,text/plain"
+              accept=".eml,.msg,message/rfc822,application/vnd.ms-outlook,text/plain"
               className="sr-only"
               onChange={(e) => {
                 const f = e.target.files?.[0];
@@ -412,7 +426,7 @@ export function TriagePage({ heading, lead, example, placeholder }: { heading: s
       </div>
 
       <div ref={resultsRef} aria-label="Results" className="scroll-mt-4">
-        {msg && <TriageResults key={run + (file ? `f:${file.name}` : "p")} msg={msg} onOpenMessage={openBytes} />}
+        {msg && <TriageResults key={run + (file ? `f:${file.name}` : "p")} msg={msg} onOpenMessage={(name, a) => openFile({ name, bytes: a.bytes, ...(a.message ? { parsed: a.message } : {}) })} />}
       </div>
     </section>
   );

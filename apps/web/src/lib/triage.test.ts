@@ -248,6 +248,16 @@ describe("triage", () => {
   });
 
   it("writes a ticket note for a message without headers or attachments", () => {
+    const embedded = ticketNote({
+      headers: null,
+      flags: [],
+      attachments: [{ filename: "Fwd: invoice.msg", contentType: "application/vnd.ms-outlook", size: 0, embedded: true, sniffed: null, findings: [] }],
+      hashes: [undefined],
+      indicators: [],
+      verdicts: new Map(),
+    });
+    expect(embedded).toContain("- Fwd: invoice[.]msg (an attached Outlook message: triage it separately)");
+    expect(embedded).not.toContain("SHA-256");
     const note = ticketNote({ headers: null, flags: [], attachments: [], hashes: [], indicators: [], verdicts: new Map() });
     expect(note).toContain("Subject: (none)");
     expect(note).toContain("Authentication: no results in the headers");

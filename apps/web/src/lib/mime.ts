@@ -6,7 +6,7 @@ import { decodeEncodedWords } from "./email-headers";
  * malformed input gives a best-effort result plus warnings.
  */
 
-/** Largest .eml file the triage tool reads. */
+/** Largest .eml or .msg file the triage tool reads. */
 export const MAX_EML_BYTES = 10 * 1024 * 1024;
 /** Deepest nesting of multiparts we follow. */
 export const MAX_MIME_DEPTH = 10;
@@ -18,6 +18,8 @@ export interface MimeAttachment {
   contentType: string;
   size: number;
   bytes: Uint8Array<ArrayBuffer>;
+  /** A message attached inside an Outlook .msg, already parsed (it has no bytes of its own). */
+  message?: ParsedMessage;
 }
 
 export interface ParsedMessage {

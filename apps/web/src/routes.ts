@@ -131,9 +131,9 @@ export const TOOLS: readonly ToolRoute[] = [
     name: "Phishing triage",
     title: "Phishing email triage: check a reported email in your browser | Bluebench",
     description:
-      "Paste a reported email or drop the .eml file: sender checks, links that lie about where they go, risky attachments and every indicator. Runs in your browser.",
+      "Paste a reported email or drop the .eml or .msg file: sender checks, links that lie about where they go, risky attachments and every indicator. Runs in your browser.",
     h1: "Phishing triage",
-    lead: "Someone reported an email. Paste its source or drop the .eml file to see the red flags in one place: sender, links, attachments and indicators.",
+    lead: "Someone reported an email. Paste its source or drop the .eml or .msg file to see the red flags in one place: sender, links, attachments and indicators.",
     placeholder: "Paste the whole message source, headers first (Show original or View source)",
     example: [
       "Received: from mail.example.net (mail.example.net [192.0.2.10]) by mx.example.org with ESMTPS; Tue, 08 Oct 2024 10:00:05 +0000",
@@ -190,7 +190,7 @@ export const TOOLS: readonly ToolRoute[] = [
       {
         heading: "How to get the message",
         paragraphs: [
-          "Gmail: More (⋮) → Download message saves an .eml file, or Show original lets you copy the source. Outlook on the web: ⋯ → View → View message source, or save the message as .eml. Apple Mail: File → Save As, format Raw Message Source. Classic Outlook's .msg files can't be read here. Files up to 10 MB; pastes up to 64 KB.",
+          "Gmail: More (⋮) → Download message saves an .eml file, or Show original lets you copy the source. Outlook on the web: ⋯ → View → View message source, or save the message as .eml. Apple Mail: File → Save As, format Raw Message Source. Classic Outlook: drag the message from Outlook to your desktop to get a .msg file, and drop that here. Files up to 10 MB; pastes up to 64 KB.",
         ],
       },
       {
