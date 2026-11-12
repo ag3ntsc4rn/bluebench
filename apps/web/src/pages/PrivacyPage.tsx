@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 export const PRIVACY_CONTACT = "privacy@bluebench.dev";
-export const PRIVACY_UPDATED = "20 October 2026";
+export const PRIVACY_UPDATED = "12 November 2026";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -104,7 +104,7 @@ export function PrivacyPage() {
           paste into them is never sent to us or anyone else.
         </p>
         <p>
-          <strong>Phishing triage</strong> reads the message you paste or the .eml file you choose, including its body and
+          <strong>Phishing triage</strong> reads the message you paste or the .eml or Outlook .msg file you choose, including its body and
           attachments, only in your browser. They're never sent to us or anyone else, and the message is only parsed: its
           links aren't visited, its images and other content aren't loaded, and its attachments aren't opened. As with the
           bulk view, only the indicators you choose to check are sent, when you press Check reputation.

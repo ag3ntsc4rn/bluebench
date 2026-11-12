@@ -157,7 +157,9 @@ export function collectLinks(msg: Pick<ParsedMessage, "text">, html: readonly Ht
 
 // --- Attachments ---
 
-export interface AttachmentReport extends Omit<MimeAttachment, "bytes"> {
+export interface AttachmentReport extends Omit<MimeAttachment, "bytes" | "message"> {
+  /** An Outlook message attached inside a .msg: no bytes of its own, opened separately. */
+  embedded?: boolean;
   /** What the first bytes say it is, if recognised. */
   sniffed: string | null;
   findings: Finding[];
@@ -266,7 +268,7 @@ export function classifyAttachment(a: Pick<MimeAttachment, "filename" | "content
 }
 
 export function reportAttachment(a: MimeAttachment): AttachmentReport {
-  return { filename: a.filename, contentType: a.contentType, size: a.size, ...classifyAttachment(a) };
+  return { filename: a.filename, contentType: a.contentType, size: a.size, ...(a.message ? { embedded: true } : {}), ...classifyAttachment(a) };
 }
 
 export async function sha256Hex(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
@@ -356,6 +358,10 @@ export function ticketNote(t: TicketInput): string {
   lines.push("", `Attachments (${t.attachments.length}):`);
   if (t.attachments.length === 0) lines.push("- None");
   t.attachments.forEach((a, i) => {
+    if (a.embedded) {
+      lines.push(`- ${defangText(a.filename)} (an attached Outlook message: triage it separately)`);
+      return;
+    }
     lines.push(`- ${defangText(a.filename)} (${a.contentType}, ${formatSize(a.size)}${a.sniffed ? `, content: ${a.sniffed}` : ""})`);
     lines.push(`    SHA-256: ${t.hashes[i] ?? "(not calculated)"}`);
   });

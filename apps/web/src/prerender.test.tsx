@@ -44,7 +44,7 @@ describe("prerender", () => {
     const html = byFile["phishing-triage.html"]!;
     expect(html).toMatch(/<div id="root">.*<h1[^>]*>Phishing triage<\/h1>/s);
     expect(html).toContain('type="file"');
-    expect(html).toContain("Choose .eml file");
+    expect(html).toContain("Choose .eml or .msg file");
     expect(byFile["index.html"]).toContain('href="/phishing-triage"');
     expect(sitemap(pages)).toContain("<loc>https://bluebench.dev/phishing-triage</loc>");
   });
